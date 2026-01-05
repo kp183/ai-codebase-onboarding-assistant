@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Codebase Onboarding Assistant</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI Codebase Onboarding Assistant</h1>
+            <p>Ask questions about the codebase and get grounded answers with source references</p>
+        </header>
+        
+        <main>
+            <!-- Statistics Bar -->
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-icon">📁</span>
+                    <span class="stat-label">Files indexed:</span>
+                    <span class="stat-value">35</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">📊</span>
+                    <span class="stat-label">Code chunks:</span>
+                    <span class="stat-value">432</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🔍</span>
+                    <span class="stat-label">Languages supported:</span>
+                    <span class="stat-value">8</span>
+                </div>
+            </div>
+
+            <div class="chat-container">
+                <div id="chat-messages" class="chat-messages">
+                    <div class="welcome-message">
+                        <p>Welcome! I'm here to help you understand the codebase.</p>
+                        <p class="subtitle">Ask questions about code structure, functionality, or get started with the buttons below.</p>
+                        
+                        <!-- Quick Demo Questions -->
+                        <div class="quick-questions">
+                            <h4>💡 Try these questions:</h4>
+                            <div class="question-buttons">
+                                <button id="where-to-start-btn" class="predefined-btn primary">
+                                    <span class="btn-icon">🚀</span>
+                                    Where do I start?
+                                </button>
+                                <button class="predefined-btn" onclick="chatApp.askDemoQuestion('How do I run this application?')">
+                                    <span class="btn-icon">▶️</span>
+                                    How to run?
+                                </button>
+                                <button class="predefined-btn" onclick="chatApp.askDemoQuestion('What are the main API endpoints?')">
+                                    <span class="btn-icon">🔗</span>
+                                    API endpoints?
+                                </button>
+                                <button class="predefined-btn" onclick="chatApp.askDemoQuestion('Explain the architecture and main components')">
+                                    <span class="btn-icon">🏗️</span>
+                                    Architecture?
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Optional Repository Input -->
+                        <div class="repo-input-section">
+                            <h4>📁 Analyze Your Repository</h4>
+                            <div class="repo-input-container">
+                                <input type="url" id="repo-url" placeholder="Enter GitHub repository URL..." class="repo-input">
+                                <button class="repo-analyze-btn" onclick="chatApp.handleRepoInput()">
+                                    <span class="btn-icon">🔍</span>
+                                    Analyze
+                                </button>
+                            </div>
+                            <p class="repo-note">💡 <strong>Demo Note:</strong> Currently showing pre-indexed repository. Repository analysis feature coming soon!</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chat-input-container">
+                    <div id="error-display" class="error-display" style="display: none;"></div>
+                    <form id="chat-form">
+                        <div class="input-group">
+                            <input 
+                                type="text" 
+                                id="chat-input" 
+                                placeholder="Ask a question about the codebase..."
+                                required
+                                maxlength="500"
+                            >
+                            <button type="submit" id="send-btn" aria-label="Send message">
+                                <span class="btn-text">Send</span>
+                                <span class="btn-loading" style="display: none;">
+                                    <div class="loading-spinner"></div>
+                                </span>
+                            </button>
+                        </div>
+                        <div class="input-hint">
+                            <small>Try asking: "What does this function do?", "How is authentication handled?", or "Show me the main entry points"</small>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="/static/script.js"></script>
+</body>
+</html>
