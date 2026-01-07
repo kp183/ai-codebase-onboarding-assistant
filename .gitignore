@@ -22,6 +22,10 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Development artifacts
+.kiro/
+.pytest_cache/
+
 # Test artifacts
 .coverage
 htmlcov/
