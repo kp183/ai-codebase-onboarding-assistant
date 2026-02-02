@@ -90,6 +90,3 @@ python test_demo_workflow.py
 
 ✅ All demo workflows validated (8/8 tests passing)
 
-## 🏆 Built for Imagine Cup 2026
-
-This project is an MVP built for the Microsoft Imagine Cup 2026, focusing on developer education, onboarding, and productivity through AI.
