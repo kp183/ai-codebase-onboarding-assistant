@@ -7,6 +7,7 @@ and orchestration of the complete pipeline from ingestion to chat responses.
 
 import asyncio
 import logging
+import hashlib
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -198,70 +199,58 @@ class ServiceManager:
         try:
             logger.info(f"Starting complete repository ingestion for: {repo_url}")
             
-            # Step 1: Ingest repository files
-            ingestion_result = await repository_service.ingest_repository(repo_url)
-            if not ingestion_result.success:
-                return ingestion_result
+            async with repository_service.repository_files(repo_url) as code_files:
+                if not code_files:
+                    return IngestionResult(
+                        success=False,
+                        file_count=0,
+                        message="No supported code files found; nothing was indexed.",
+                        processed_files=[]
+                    )
             
-            # Step 2: Get the ingested files (in a real implementation, this would be stored)
-            # For now, we'll re-fetch the files to continue the pipeline
-            logger.info("Re-fetching files for processing pipeline...")
+                # Step 3: Chunk all code files
+                logger.info(f"Chunking {len(code_files)} code files...")
+                all_chunks = []
+                for code_file in sorted(code_files, key=lambda item: item.file_path):
+                    chunks = chunking_service.chunk_code_file(code_file)
+                    all_chunks.extend(chunks)
             
-            # This is a simplified approach - in production, you'd store the files from step 1
-            temp_ingestion = await repository_service.ingest_repository(repo_url)
-            if not temp_ingestion.success:
-                return temp_ingestion
+                if not all_chunks:
+                    return IngestionResult(
+                        success=False,
+                        file_count=len(code_files),
+                        message="No chunks were created; nothing was indexed.",
+                        processed_files=[f.file_path for f in code_files],
+                        errors=["No indexable chunks found"]
+                    )
+
+                for index, chunk in enumerate(all_chunks):
+                    chunk.id = hashlib.sha256(f"{repo_url.rstrip('/').removesuffix('.git')}:{chunk.file_path}:{index}".encode()).hexdigest()
             
-            # Get code files from the temporary directory (this is a workaround for the demo)
-            code_files = []
-            if hasattr(repository_service, '_temp_dir') and repository_service._temp_dir:
-                code_files = await repository_service.fetch_code_files(repository_service._temp_dir)
+                # Step 4: Generate embeddings
+                logger.info(f"Generating embeddings for {len(all_chunks)} chunks...")
+                embedded_chunks = await self.embedding_service.generate_embeddings(all_chunks)
             
-            if not code_files:
-                return IngestionResult(
-                    success=True,
-                    file_count=0,
-                    message="Repository ingested but no code files found for processing",
-                    processed_files=[]
-                )
+                # Step 5: Store in search index
+                logger.info("Storing embeddings in search index...")
+                storage_success = self.search_service.store_embeddings(embedded_chunks)
             
-            # Step 3: Chunk all code files
-            logger.info(f"Chunking {len(code_files)} code files...")
-            all_chunks = []
-            for code_file in code_files:
-                chunks = chunking_service.chunk_code_file(code_file)
-                all_chunks.extend(chunks)
-            
-            if not all_chunks:
-                return IngestionResult(
-                    success=True,
-                    file_count=len(code_files),
-                    message="Files processed but no chunks created",
-                    processed_files=[f.file_path for f in code_files]
-                )
-            
-            # Step 4: Generate embeddings
-            logger.info(f"Generating embeddings for {len(all_chunks)} chunks...")
-            embedded_chunks = await self.embedding_service.generate_embeddings(all_chunks)
-            
-            # Step 5: Store in search index
-            logger.info("Storing embeddings in search index...")
-            storage_success = self.search_service.store_embeddings(embedded_chunks)
-            
-            if storage_success:
-                return IngestionResult(
-                    success=True,
-                    file_count=len(code_files),
-                    message=f"Successfully processed {len(code_files)} files and created {len(embedded_chunks)} searchable chunks",
-                    processed_files=[f.file_path for f in code_files]
-                )
-            else:
-                return IngestionResult(
-                    success=False,
-                    file_count=len(code_files),
-                    message="Files processed but failed to store in search index",
-                    errors=["Search index storage failed"]
-                )
+                if storage_success:
+                    return IngestionResult(
+                        success=True,
+                        file_count=len(code_files),
+                        chunks_indexed=len(embedded_chunks),
+                        message=f"Successfully processed {len(code_files)} files and created {len(embedded_chunks)} searchable chunks",
+                        processed_files=[f.file_path for f in code_files]
+                    )
+                else:
+                    return IngestionResult(
+                        success=False,
+                        file_count=len(code_files),
+                        chunks_indexed=0,
+                        message="Files processed but failed to store in search index",
+                        errors=["Search index storage failed"]
+                    )
                 
         except Exception as e:
             logger.error(f"Repository ingestion pipeline failed: {str(e)}")

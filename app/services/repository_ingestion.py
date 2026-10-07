@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import List, Set, Optional
 from urllib.parse import urlparse
 import logging
+from contextlib import asynccontextmanager
 
 import git
 import requests
@@ -40,6 +41,7 @@ class RepositoryIngestionService:
     
     # Maximum file size in bytes (1MB)
     MAX_FILE_SIZE: int = 1024 * 1024
+    SKIP_DIRS = {"node_modules", ".git", "build", "dist", "out", "target", "coverage", ".next", "vendor"}
     
     # Timeout for Git operations in seconds
     GIT_TIMEOUT: int = 300  # 5 minutes
@@ -144,6 +146,8 @@ class RepositoryIngestionService:
         try:
             # Walk through all files in the repository
             for file_path in repo_path_obj.rglob('*'):
+                if any(part in self.SKIP_DIRS for part in file_path.relative_to(repo_path_obj).parts[:-1]):
+                    continue
                 if file_path.is_file() and self.validate_file_type(str(file_path)):
                     try:
                         # Skip files that are too large
@@ -154,6 +158,8 @@ class RepositoryIngestionService:
                         # Read file content
                         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                             content = f.read()
+                        if "\x00" in content:
+                            continue
                         
                         # Create relative path from repository root
                         relative_path = file_path.relative_to(repo_path_obj)
@@ -261,6 +267,20 @@ class RepositoryIngestionService:
             logger.warning(f"Could not check repository accessibility: {e}")
             return False
     
+    @asynccontextmanager
+    async def repository_files(self, repo_url: str):
+        """Yield files from a private per-request clone, removing it on exit."""
+        if not self._is_valid_github_url(repo_url):
+            raise ValueError("Invalid GitHub repository URL")
+        if not await self._check_repository_accessibility(repo_url):
+            raise ValueError("Repository is not accessible; check the URL and ensure it is public")
+        temp_dir = tempfile.mkdtemp(prefix="repo_ingestion_")
+        try:
+            git.Repo.clone_from(repo_url, temp_dir, depth=1, timeout=self.GIT_TIMEOUT)
+            yield await self.fetch_code_files(temp_dir)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
     async def _clone_and_extract_files(self, repo_url: str) -> List[CodeFile]:
         """
         Clone the repository and extract code files.

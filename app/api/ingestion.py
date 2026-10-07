@@ -50,16 +50,20 @@ async def ingest_repository(request: IngestionRequest):
         
         if result.success:
             logger.info(f"Repository ingestion pipeline completed successfully: {result.message}")
+            if result.chunks_indexed <= 0:
+                raise HTTPException(status_code=422, detail="Ingestion completed without indexing any chunks.")
         else:
             logger.warning(f"Repository ingestion pipeline failed: {result.message}")
-        
+            raise HTTPException(status_code=422, detail=result.message)
         return result
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error during repository ingestion pipeline: {e}")
         raise HTTPException(
             status_code=500,
-            detail="Internal server error during repository ingestion pipeline"
+            detail=str(e)
         )
 
 

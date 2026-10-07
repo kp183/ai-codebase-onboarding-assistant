@@ -148,7 +148,7 @@ class ChatApp {
         this.chatForm.dispatchEvent(new Event('submit'));
     }
     
-    handleRepoInput() {
+    async handleRepoInput() {
         const repoUrl = document.getElementById('repo-url').value.trim();
         
         if (!repoUrl) {
@@ -156,16 +156,23 @@ class ChatApp {
             return;
         }
         
-        // Demo version - show friendly message
-        this.addSystemMessage(
-            `🔍 Repository analysis requested for: ${repoUrl}\n\n` +
-            `💡 **Demo Mode**: This demo currently shows a pre-indexed repository (AI Codebase Onboarding Assistant). ` +
-            `The repository analysis feature is coming soon!\n\n` +
-            `For now, you can explore the current codebase using the questions above or ask your own questions about the code structure, APIs, and functionality.`
-        );
-        
-        // Clear the input
-        document.getElementById('repo-url').value = '';
+        const button = document.querySelector('.repo-analyze-btn');
+        button.disabled = true;
+        this.addSystemMessage('Cloning and indexing repository…');
+        try {
+            const response = await fetch('/api/ingest', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({repository_url: repoUrl})
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.detail || `Ingestion failed (${response.status})`);
+            this.addSystemMessage(`Indexed ${data.chunks_indexed} chunks from ${data.file_count} files. Ask questions about this repository now.`);
+            document.getElementById('repo-url').value = '';
+        } catch (error) {
+            this.addSystemMessage(`Repository ingestion failed: ${error.message}`);
+        } finally {
+            button.disabled = false;
+        }
     }
     
     addSystemMessage(message) {
