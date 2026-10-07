@@ -270,6 +270,13 @@ class RepositoryIngestionService:
     @asynccontextmanager
     async def repository_files(self, repo_url: str):
         """Yield files from a private per-request clone, removing it on exit."""
+        from app.config import settings
+        if settings.demo_mode:
+            fixture_root = (Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "sample_repo").resolve()
+            local_path = Path(repo_url.removeprefix("file://")).resolve()
+            if local_path == fixture_root:
+                yield await self.fetch_code_files(str(local_path))
+                return
         if not self._is_valid_github_url(repo_url):
             raise ValueError("Invalid GitHub repository URL")
         if not await self._check_repository_accessibility(repo_url):

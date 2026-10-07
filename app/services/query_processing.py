@@ -39,7 +39,7 @@ class QueryProcessingService:
         else:
             # Import settings only when needed to avoid config issues in tests
             from app.config import settings
-            self.client = AsyncAzureOpenAI(
+            self.client = None if settings.demo_mode else AsyncAzureOpenAI(
                 api_key=settings.azure_openai_api_key,
                 api_version=settings.azure_openai_api_version,
                 azure_endpoint=settings.azure_openai_endpoint
@@ -70,6 +70,17 @@ class QueryProcessingService:
             
             # Step 1: Retrieve relevant code chunks
             relevant_chunks = await self.retrieve_relevant_chunks(user_question, top_k)
+
+            from app.config import settings
+            if settings.demo_mode:
+                if not relevant_chunks or relevant_chunks[0].score < 0.10:
+                    answer = "Not found in repo. I could not retrieve code chunks with enough matching content to answer this question."
+                    relevant_chunks = []
+                else:
+                    cited = relevant_chunks[:3]
+                    answer = "Retrieval-only answer (DEMO MODE): the most relevant repository snippets are below. Verify the code directly.\n\n"
+                    answer += "\n\n".join(f"{item.chunk.file_path}:{item.chunk.start_line}-{item.chunk.end_line}\n{item.chunk.content[:700]}" for item in cited)
+                return QueryResponse(answer=answer, sources=[item.to_source_reference() for item in relevant_chunks[:3]], confidence_score=self._calculate_confidence_score(relevant_chunks), processing_time_ms=int((time.time()-start_time)*1000))
             
             # Step 2: Generate grounded response
             answer = await self.generate_grounded_response(user_question, relevant_chunks)

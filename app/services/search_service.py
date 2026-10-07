@@ -31,6 +31,7 @@ from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from app.models.data_models import EmbeddedChunk, CodeChunk, SourceReference
 
 logger = logging.getLogger(__name__)
+_LOCAL_DOCUMENTS: Dict[str, tuple] = {}
 
 
 class SearchResult:
@@ -81,6 +82,12 @@ class SearchService:
             self.search_endpoint = settings.azure_search_endpoint
             self.api_key = settings.azure_search_api_key
             self.index_name = settings.azure_search_index_name
+
+        from app.config import settings
+        self.local_mode = settings.demo_mode
+        if self.local_mode:
+            self.index_client = self.search_client = None
+            return
         
         # Initialize clients
         credential = AzureKeyCredential(self.api_key)
@@ -183,6 +190,10 @@ class SearchService:
         if not embedded_chunks:
             logger.warning("No embedded chunks provided for storage")
             return True
+        if self.local_mode:
+            for item in embedded_chunks:
+                _LOCAL_DOCUMENTS[item.chunk.id] = (item.chunk, item.embedding)
+            return True
             
         try:
             logger.info(f"Storing {len(embedded_chunks)} embedded chunks in search index")
@@ -256,6 +267,12 @@ class SearchService:
             Exception: If search operation fails
         """
         try:
+            if self.local_mode:
+                scored = []
+                for chunk, vector in _LOCAL_DOCUMENTS.values():
+                    score = sum(a * b for a, b in zip(query_embedding, vector))
+                    scored.append(SearchResult(chunk, score))
+                return sorted(scored, key=lambda result: result.score, reverse=True)[:top_k]
             logger.debug(f"Performing vector search with top_k={top_k}")
             
             # Create vectorized query
@@ -435,6 +452,8 @@ class SearchService:
             Exception: If count operation fails
         """
         try:
+            if self.local_mode:
+                return len(_LOCAL_DOCUMENTS)
             # Perform an empty search to get total count
             results = self.search_client.search(
                 search_text="*",
@@ -492,6 +511,8 @@ class SearchService:
             True if index exists, False otherwise
         """
         try:
+            if self.local_mode:
+                return True
             self.index_client.get_index(self.index_name)
             return True
         except ResourceNotFoundError:

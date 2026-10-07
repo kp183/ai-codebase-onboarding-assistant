@@ -3,7 +3,7 @@ API endpoints for repository ingestion functionality.
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field
 import logging
 
 from app.services.service_manager import get_service_manager
@@ -16,7 +16,7 @@ router = APIRouter()
 
 class IngestionRequest(BaseModel):
     """Request model for repository ingestion."""
-    repository_url: HttpUrl
+    repository_url: str = Field(..., min_length=1)
 
 
 @router.post("/ingest", response_model=IngestionResult)

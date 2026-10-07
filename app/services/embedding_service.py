@@ -6,7 +6,9 @@ Azure OpenAI's text-embedding-3-small model, with batch processing and retry log
 """
 
 import asyncio
+import hashlib
 import logging
+import re
 from datetime import datetime
 from typing import List, Optional
 from openai import AsyncAzureOpenAI
@@ -40,12 +42,12 @@ class EmbeddingService:
         else:
             # Import settings only when needed to avoid config issues in tests
             from app.config import settings
-            self.client = AsyncAzureOpenAI(
+            self.embedding_model = "local-hash-v1" if settings.demo_mode else settings.azure_openai_embedding_deployment
+            self.client = None if settings.demo_mode else AsyncAzureOpenAI(
                 api_key=settings.azure_openai_embedding_api_key,
                 api_version=settings.azure_openai_embedding_api_version,
                 azure_endpoint=settings.azure_openai_embedding_endpoint
             )
-            self.embedding_model = settings.azure_openai_embedding_deployment
         
         self.batch_size = batch_size
         
@@ -64,6 +66,10 @@ class EmbeddingService:
         """
         if not chunks:
             return []
+
+        from app.config import settings
+        if settings.demo_mode:
+            return [EmbeddedChunk(chunk=chunk, embedding=self._local_embedding(chunk.content), embedding_model=self.embedding_model, created_at=datetime.utcnow()) for chunk in chunks]
             
         logger.info(f"Generating embeddings for {len(chunks)} code chunks")
         
@@ -112,6 +118,9 @@ class EmbeddingService:
         Raises:
             Exception: If API call fails after retries
         """
+        from app.config import settings
+        if settings.demo_mode:
+            return [self._local_embedding(text) for text in texts]
         try:
             logger.debug(f"Calling Azure OpenAI embedding API for {len(texts)} texts")
             
@@ -145,6 +154,16 @@ class EmbeddingService:
         """
         embeddings = await self._batch_embed([text])
         return embeddings[0]
+
+    @staticmethod
+    def _local_embedding(text: str, dimensions: int = 256) -> List[float]:
+        """Deterministic feature-hash vector; no network or model credentials."""
+        vector = [0.0] * dimensions
+        for token in re.findall(r"[A-Za-z_][A-Za-z_0-9]*", text.lower()):
+            digest = hashlib.sha256(token.encode("utf-8")).digest()
+            vector[int.from_bytes(digest[:4], "big") % dimensions] += 1.0
+        norm = sum(value * value for value in vector) ** 0.5
+        return [value / norm for value in vector] if norm else vector
     
     async def close(self):
         """Close the Azure OpenAI client connection."""

@@ -58,6 +58,12 @@ class ServiceManager:
             self.search_service = get_search_service()
             self.query_processing_service = get_query_processing_service()
             self.predefined_query_service = get_predefined_query_service()
+
+            if settings.demo_mode:
+                self._initialized = self._services_healthy = True
+                self._last_health_check = datetime.utcnow()
+                logger.info("Local DEMO_MODE initialized without Azure credentials")
+                return True
             
             # Perform startup checks
             startup_checks = await self._perform_startup_checks()
@@ -357,6 +363,8 @@ Keep it professional and helpful, but mention this is a demo response."""
             QueryResponse with predefined answer and source references
         """
         logger.info(f"Processing predefined query: {query_type}")
+        if settings.demo_mode and query_type == "where-to-start":
+            return await self.process_chat_query("Where should a new developer start in this repository?")
         logger.info(f"Service manager initialized: {self._initialized}")
         
         if not self._initialized:
