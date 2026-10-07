@@ -36,9 +36,11 @@ class QueryProcessingService:
         if client is not None:
             self.client = client
             self.chat_model = chat_model or "gpt-4"
+            self.local_mode = False
         else:
             # Import settings only when needed to avoid config issues in tests
             from app.config import settings
+            self.local_mode = settings.demo_mode
             self.client = None if settings.demo_mode else AsyncAzureOpenAI(
                 api_key=settings.azure_openai_api_key,
                 api_version=settings.azure_openai_api_version,
@@ -71,8 +73,7 @@ class QueryProcessingService:
             # Step 1: Retrieve relevant code chunks
             relevant_chunks = await self.retrieve_relevant_chunks(user_question, top_k)
 
-            from app.config import settings
-            if settings.demo_mode:
+            if self.local_mode:
                 if not relevant_chunks or relevant_chunks[0].score < 0.10:
                     answer = "Not found in repo. I could not retrieve code chunks with enough matching content to answer this question."
                     relevant_chunks = []

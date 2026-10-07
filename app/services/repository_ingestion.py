@@ -5,12 +5,11 @@ This module provides functionality to fetch code files from GitHub repositories,
 filter by supported file types, and handle errors gracefully.
 """
 
-import os
 import tempfile
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import List, Set, Optional
+from typing import List, Set
 from urllib.parse import urlparse
 import logging
 from contextlib import asynccontextmanager
@@ -48,7 +47,6 @@ class RepositoryIngestionService:
     
     def __init__(self):
         """Initialize the repository ingestion service."""
-        self._temp_dir: Optional[str] = None
     
     async def ingest_repository(self, repo_url: str) -> IngestionResult:
         """
@@ -122,10 +120,6 @@ class RepositoryIngestionService:
                 errors=[f"Unexpected error: {str(e)}"]
             )
         
-        finally:
-            # Clean up temporary directory
-            self._cleanup_temp_directory()
-    
     async def fetch_code_files(self, repo_path: str) -> List[CodeFile]:
         """
         Extract and filter code files from a local repository path.
@@ -171,7 +165,7 @@ class RepositoryIngestionService:
                         last_modified = datetime.fromtimestamp(file_path.stat().st_mtime)
                         
                         code_file = CodeFile(
-                            file_path=str(relative_path),
+                            file_path=relative_path.as_posix(),
                             content=content,
                             language=language,
                             size_bytes=file_path.stat().st_size,
@@ -269,7 +263,7 @@ class RepositoryIngestionService:
     
     @asynccontextmanager
     async def repository_files(self, repo_url: str):
-        """Yield files from a private per-request clone, removing it on exit."""
+        """Yield files from a per-request clone, removing it on exit."""
         from app.config import settings
         if settings.demo_mode:
             fixture_root = (Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "sample_repo").resolve()
@@ -299,7 +293,7 @@ class RepositoryIngestionService:
             List of extracted CodeFile objects
         """
         # Create temporary directory for cloning
-        self._temp_dir = tempfile.mkdtemp(prefix="repo_ingestion_")
+        temp_dir = tempfile.mkdtemp(prefix="repo_ingestion_")
         
         try:
             logger.info(f"Cloning repository: {repo_url}")
@@ -307,21 +301,23 @@ class RepositoryIngestionService:
             # Clone repository with timeout
             repo = git.Repo.clone_from(
                 repo_url, 
-                self._temp_dir,
+                temp_dir,
                 depth=1,  # Shallow clone for faster operation
                 timeout=self.GIT_TIMEOUT
             )
             
-            logger.info(f"Repository cloned to: {self._temp_dir}")
+            logger.info(f"Repository cloned to: {temp_dir}")
             
             # Extract code files
-            code_files = await self.fetch_code_files(self._temp_dir)
+            code_files = await self.fetch_code_files(temp_dir)
             
             return code_files
             
         except git.exc.GitCommandError as e:
             logger.error(f"Git clone failed: {e}")
             raise
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
     
     def _detect_language(self, file_path: str) -> str:
         """
@@ -360,17 +356,5 @@ class RepositoryIngestionService:
         
         return language_map.get(extension, 'unknown')
     
-    def _cleanup_temp_directory(self):
-        """Clean up temporary directory used for cloning."""
-        if self._temp_dir and os.path.exists(self._temp_dir):
-            try:
-                shutil.rmtree(self._temp_dir)
-                logger.info(f"Cleaned up temporary directory: {self._temp_dir}")
-            except Exception as e:
-                logger.warning(f"Could not clean up temporary directory {self._temp_dir}: {e}")
-            finally:
-                self._temp_dir = None
-
-
 # Global service instance
 repository_service = RepositoryIngestionService()

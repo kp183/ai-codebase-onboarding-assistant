@@ -89,7 +89,10 @@ async def root():
     """Serve the main web UI."""
     try:
         with open("static/index.html", "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
+            content = f.read()
+            if settings.demo_mode:
+                content = content.replace('id="demo-mode-badge" class="demo-mode-badge" role="status" style="display:none;', 'id="demo-mode-badge" class="demo-mode-badge" role="status" style="display:inline-block;')
+            return HTMLResponse(content=content)
     except FileNotFoundError:
         return HTMLResponse(
             content="<h1>AI Codebase Onboarding Assistant</h1><p>Web UI not found. Please ensure static files are available.</p>",

@@ -39,10 +39,12 @@ class EmbeddingService:
         if client is not None:
             self.client = client
             self.embedding_model = embedding_model or "text-embedding-3-small"
+            self.local_mode = False
         else:
             # Import settings only when needed to avoid config issues in tests
             from app.config import settings
             self.embedding_model = "local-hash-v1" if settings.demo_mode else settings.azure_openai_embedding_deployment
+            self.local_mode = settings.demo_mode
             self.client = None if settings.demo_mode else AsyncAzureOpenAI(
                 api_key=settings.azure_openai_embedding_api_key,
                 api_version=settings.azure_openai_embedding_api_version,
@@ -67,8 +69,7 @@ class EmbeddingService:
         if not chunks:
             return []
 
-        from app.config import settings
-        if settings.demo_mode:
+        if self.local_mode:
             return [EmbeddedChunk(chunk=chunk, embedding=self._local_embedding(chunk.content), embedding_model=self.embedding_model, created_at=datetime.utcnow()) for chunk in chunks]
             
         logger.info(f"Generating embeddings for {len(chunks)} code chunks")
@@ -118,8 +119,7 @@ class EmbeddingService:
         Raises:
             Exception: If API call fails after retries
         """
-        from app.config import settings
-        if settings.demo_mode:
+        if self.local_mode:
             return [self._local_embedding(text) for text in texts]
         try:
             logger.debug(f"Calling Azure OpenAI embedding API for {len(texts)} texts")

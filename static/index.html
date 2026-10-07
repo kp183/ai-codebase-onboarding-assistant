@@ -14,27 +14,27 @@
         </header>
         
         <main>
-            <!-- Statistics Bar -->
+            <!-- Honest local demo status -->
             <div class="stats-bar">
                 <div class="stat-item">
                     <span class="stat-icon">📁</span>
-                    <span class="stat-label">Files indexed:</span>
-                    <span class="stat-value">35</span>
+                    <span class="stat-label">Repository:</span>
+                    <span class="stat-value">none ingested</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-icon">📊</span>
-                    <span class="stat-label">Code chunks:</span>
-                    <span class="stat-value">432</span>
+                    <span class="stat-label">Index:</span>
+                    <span class="stat-value">in-memory</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-icon">🔍</span>
-                    <span class="stat-label">Languages supported:</span>
-                    <span class="stat-value">8</span>
+                    <span class="stat-label">Embeddings:</span>
+                    <span class="stat-value">local deterministic</span>
                 </div>
             </div>
 
             <div class="chat-container">
-                <div class="demo-mode-badge" role="status" style="display:inline-block;background:#fff3cd;color:#664d03;padding:6px 10px;border-radius:12px;font-weight:700;font-size:12px;margin:8px 0">DEMO MODE · local retrieval, no Azure required</div>
+                <div id="demo-mode-badge" class="demo-mode-badge" role="status" style="display:none;background:#fff3cd;color:#664d03;padding:6px 10px;border-radius:12px;font-weight:700;font-size:12px;margin:8px 0">DEMO MODE · local retrieval, no Azure required</div>
                 <div id="chat-messages" class="chat-messages">
                     <div class="welcome-message">
                         <p>Welcome! I'm here to help you understand the codebase.</p>

@@ -204,6 +204,8 @@ class ServiceManager:
         """
         try:
             logger.info(f"Starting complete repository ingestion for: {repo_url}")
+            if not self._initialized and not await self.initialize_services():
+                raise RuntimeError("Services could not be initialized")
             
             async with repository_service.repository_files(repo_url) as code_files:
                 if not code_files:
@@ -569,10 +571,6 @@ Keep it encouraging and practical. Format it nicely with clear sections."""
             
             if self.predefined_query_service:
                 await self.predefined_query_service.close()
-            
-            # Clean up repository service temp directories
-            if hasattr(repository_service, '_cleanup_temp_directory'):
-                repository_service._cleanup_temp_directory()
             
             self._initialized = False
             self._services_healthy = False

@@ -166,6 +166,12 @@ class ChatApp {
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.detail || `Ingestion failed (${response.status})`);
+            const stats = document.querySelectorAll('.stats-bar .stat-value');
+            if (stats.length >= 3) {
+                stats[0].textContent = 'ingested';
+                stats[1].textContent = `${data.chunks_indexed} chunks`;
+                stats[2].textContent = `${data.file_count} files`;
+            }
             this.addSystemMessage(`Indexed ${data.chunks_indexed} chunks from ${data.file_count} files. Ask questions about this repository now.`);
             document.getElementById('repo-url').value = '';
         } catch (error) {

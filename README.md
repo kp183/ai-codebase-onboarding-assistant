@@ -1,92 +1,40 @@
-# AI Codebase Onboarding Assistant 🚀
+# AI Codebase Onboarding Assistant
 
-An AI-powered assistant that helps developers understand, explore, and onboard onto any codebase using natural language queries with grounded, source-linked answers.
+A small FastAPI application for ingesting a repository and asking questions with retrieved code snippets and file/line citations.
 
----
+## Local demo (no Azure credentials)
 
-## 🎯 Problem
+Verified Python: 3.11, 3.12, and 3.13 on Windows with a clean dependency install and the default test suite.
 
-Developers joining new teams often struggle to understand large, unfamiliar codebases. 
-Documentation is outdated, onboarding is slow, and productivity drops in the first weeks.
-
----
-
-## 💡 Solution
-
-AI Codebase Onboarding Assistant uses:
-- **Azure OpenAI** for reasoning over code
-- **Azure AI Search** for semantic vector search
-- **FastAPI** for scalable backend APIs
-
-Developers can ask questions like:
-- *Where do I start?*
-- *How do I run this project?*
-- *What are the main API endpoints?*
-- *Explain the architecture*
-
-And receive **grounded answers with source references**.
-
----
-
-## ⚠️ Demo Notice (Important)
-
-> This repository is **pre-indexed for demo stability**.
-In production, the platform supports ingestion of **any GitHub or internal repository**. 
-The current demo indexes this repository to ensure consistent results for judges.
-
----
-
-## 🏗️ Architecture
-
-- **Backend:** Python, FastAPI, Azure OpenAI, Azure AI Search
-- **Frontend:** HTML, CSS, Vanilla JavaScript
-- **AI Models:**
-  - GPT-4o-mini (chat)
-  - text-embedding-3-small (vector search)
-
----
-
-## 🔌 Key API Endpoints
-
-| Method | Endpoint | Description |
-|------|---------|------------|
-| GET | `/api/predefined/where-to-start` | Onboarding guidance |
-| POST | `/api/chat` | Ask questions about the codebase |
-| POST | `/api/ingest` | Repository ingestion |
-| GET | `/api/health` | Health check |
-| GET | `/docs` | Swagger UI |
-
----
-
-## ▶️ Running Locally
-
-```bash
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run development server
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
 python run_dev.py
 ```
 
-App runs at: http://localhost:8002
+Open http://127.0.0.1:8002. The included `tests/fixtures/sample_repo` can be ingested through `POST /api/ingest` by passing its absolute local path as `repository_url` in demo mode. The browser UI accepts public GitHub HTTPS URLs. After ingesting, ask about symbols or behavior in the repository.
 
-## 🔐 Environment Variables
+Demo mode uses deterministic local feature-hash embeddings and an in-memory vector store. It returns retrieved snippets as a clearly labeled retrieval-only answer; if nothing relevant is retrieved it says “Not found in repo.” Data is lost when the process stops. This is a local demo, not a multi-user or private-repository deployment.
 
-Copy `.env.example` to `.env` and fill in your Azure credentials.
+## What is implemented
 
-```bash
-cp .env.example .env
+- GitHub public repository clone, supported source-file filtering, chunking, embeddings, and indexed retrieval.
+- Local fixture ingestion and retrieval without Azure credentials when `DEMO_MODE=true`.
+- Browser form for repository ingestion and chat with source file/line references.
+
+## Not implemented / limitations
+
+- Azure mode requires configured Azure OpenAI and Azure AI Search resources; it has not been validated here.
+- Local demo embeddings are deterministic feature hashing, not semantic model embeddings. Answers are retrieved snippets, not generated explanations.
+- No authentication, tenant isolation, persistent local index, background jobs, or production deployment controls.
+- The local demo only permits ingesting the checked-in fixture path. The browser flow ingests public GitHub HTTPS repositories.
+
+## Tests
+
+```powershell
+python -m pytest
 ```
 
-## 🧪 Testing
-
-```bash
-python test_demo_workflow.py
-```
-
-✅ All demo workflows validated (8/8 tests passing)
-
+Azure integration tests are marked `azure` and skipped by default. Run them explicitly with `python -m pytest -m azure` only after configuring credentials.

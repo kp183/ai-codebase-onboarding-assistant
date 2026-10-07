@@ -88,7 +88,4 @@ def test_chat_endpoint_empty_question():
     
     response = client.post("/api/chat", json=request_data)
     
-    # Should still return 200 with placeholder response for now
-    assert response.status_code == 200
-    data = response.json()
-    assert "answer" in data
+    assert response.status_code == 422

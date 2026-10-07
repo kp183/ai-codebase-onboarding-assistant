@@ -38,7 +38,7 @@ class PredefinedQueryService:
         else:
             # Import settings only when needed to avoid config issues in tests
             from app.config import settings
-            self.client = AsyncAzureOpenAI(
+            self.client = None if settings.demo_mode else AsyncAzureOpenAI(
                 api_key=settings.azure_openai_api_key,
                 api_version=settings.azure_openai_api_version,
                 azure_endpoint=settings.azure_openai_endpoint
