@@ -48,7 +48,7 @@ class PredefinedQueryService:
         self.embedding_service = get_embedding_service()
         self.search_service = get_search_service()
     
-    async def where_do_i_start(self) -> QueryResponse:
+    async def where_do_i_start(self, repo_id: str = None) -> QueryResponse:
         """
         Generate a comprehensive "Where do I start?" response for new developers.
         
@@ -64,10 +64,15 @@ class PredefinedQueryService:
             Exception: If query processing fails
         """
         try:
+            if not repo_id:
+                return QueryResponse(
+                    answer="No repository selected. Ingest a repository before asking questions.",
+                    sources=[], confidence_score=0.0, processing_time_ms=0
+                )
             logger.info("Processing 'Where do I start?' predefined query")
             
             # Get codebase overview by searching for common entry points and patterns
-            overview_chunks = await self._get_codebase_overview()
+            overview_chunks = await self._get_codebase_overview(repo_id)
             
             # Generate structured response with overview and first task
             answer = await self._generate_overview_response(overview_chunks)
@@ -89,7 +94,7 @@ class PredefinedQueryService:
             logger.error(f"Failed to process 'Where do I start?' query: {str(e)}")
             raise
     
-    async def _get_codebase_overview(self) -> List[SearchResult]:
+    async def _get_codebase_overview(self, repo_id: str) -> List[SearchResult]:
         """
         Retrieve code chunks that provide a good overview of the codebase.
         
@@ -118,7 +123,8 @@ class PredefinedQueryService:
                     query_embedding = await self.embedding_service.embed_single_text(query)
                     results = self.search_service.vector_search(
                         query_embedding=query_embedding,
-                        top_k=3  # Get top 3 results for each query
+                        top_k=3,  # Get top 3 results for each query
+                        repo_id=repo_id,
                     )
                     all_results.extend(results)
                 except Exception as e:

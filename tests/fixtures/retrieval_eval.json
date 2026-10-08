@@ -1,0 +1,34 @@
+{
+  "repos": {
+    "fixture": {
+      "source": "tests/fixtures/sample_repo",
+      "questions": [
+        {"question": "How does calculate_total add item prices?", "expected_file": "app/cart.py", "paraphrase_set": "cart_total"},
+        {"question": "Where is the total price computed?", "expected_file": "app/cart.py", "paraphrase_set": "cart_total"},
+        {"question": "How are item prices added together?", "expected_file": "app/cart.py", "paraphrase_set": "cart_total"},
+        {"question": "Which function sums the cart's item costs?", "expected_file": "app/cart.py", "paraphrase_set": "cart_total"},
+        {"question": "How does the app calculate a basket total?", "expected_file": "app/cart.py", "paraphrase_set": "cart_total"},
+        {"question": "How does checkout handle an empty cart?", "expected_file": "app/checkout.py"},
+        {"question": "How does the catalog locate a product?", "expected_file": "app/catalog.py"},
+        {"question": "Where are sample product prices defined?", "expected_file": "app/data.py"},
+        {"question": "What prefix validates a demo token?", "expected_file": "app/auth.py"},
+        {"question": "How does the browser load the product catalog?", "expected_file": "web/api.js"}
+      ]
+    },
+    "public": {
+      "source": "https://github.com/githubtraining/hellogitworld",
+      "questions": [
+        {"question": "What prints when the app starts?", "expected_file": "src/main/java/com/github/App.java", "paraphrase_set": "greeting"},
+        {"question": "Where does main display the hello message?", "expected_file": "src/main/java/com/github/App.java", "paraphrase_set": "greeting"},
+        {"question": "Which method writes a greeting to the console?", "expected_file": "src/main/java/com/github/App.java", "paraphrase_set": "greeting"},
+        {"question": "What is written to standard output?", "expected_file": "src/main/java/com/github/App.java", "paraphrase_set": "greeting"},
+        {"question": "How does this Java program greet users?", "expected_file": "src/main/java/com/github/App.java", "paraphrase_set": "greeting"},
+        {"question": "Which test class extends TestCase?", "expected_file": "src/test/java/com/github/AppTest.java"},
+        {"question": "How are tests grouped in this repository?", "expected_file": "src/test/java/com/github/AppTest.java"},
+        {"question": "What does testApp assert?", "expected_file": "src/test/java/com/github/AppTest.java"},
+        {"question": "Does testApp verify a true condition?", "expected_file": "src/test/java/com/github/AppTest.java"},
+        {"question": "Which test class does the suite instantiate?", "expected_file": "src/test/java/com/github/AppTest.java"}
+      ]
+    }
+  }
+}

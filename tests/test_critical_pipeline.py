@@ -221,7 +221,9 @@ class TestQueryProcessing:
         mock_client.chat.completions.create = AsyncMock(return_value=mock_completion)
         
         # Test query processing
-        result = await query_service.process_query("What is the main entry point?")
+        result = await query_service.process_query(
+            "What is the main entry point?", repo_id="test-repo"
+        )
         
         assert result is not None
         assert result.answer == "This is the main FastAPI application entry point."

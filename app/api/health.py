@@ -75,24 +75,9 @@ async def detailed_health_check():
             timestamp=datetime.utcnow(),
             version=settings.app_version,
             service=settings.app_name,
-            services={"error": str(e)},
+            services={"status": "unavailable"},
             initialized=False
         )
-
-
-@router.get("/health/debug")
-async def debug_service_status():
-    """Debug endpoint to check service manager status."""
-    try:
-        service_manager = await get_service_manager()
-        return {
-            "service_manager_id": id(service_manager),
-            "initialized": service_manager._initialized,
-            "services_healthy": service_manager._services_healthy,
-            "last_health_check": service_manager._last_health_check.isoformat() if service_manager._last_health_check else None
-        }
-    except Exception as e:
-        return {"error": str(e)}
 
 
 @router.get("/health/stats")
@@ -108,6 +93,6 @@ async def system_stats():
         return await service_manager.get_system_stats()
     except Exception as e:
         return {
-            "error": str(e),
+            "error": "Health statistics unavailable",
             "timestamp": datetime.utcnow().isoformat()
         }

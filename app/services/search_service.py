@@ -118,6 +118,7 @@ class SearchService:
             fields = [
                 SimpleField(name="id", type=SearchFieldDataType.String, key=True),
                 SearchableField(name="content", type=SearchFieldDataType.String),
+                SimpleField(name="repo_id", type=SearchFieldDataType.String, filterable=True),
                 SimpleField(name="file_path", type=SearchFieldDataType.String, filterable=True),
                 SimpleField(name="start_line", type=SearchFieldDataType.Int32),
                 SimpleField(name="end_line", type=SearchFieldDataType.Int32),
@@ -205,6 +206,7 @@ class SearchService:
                 document = {
                     "id": chunk.id,
                     "content": chunk.content,
+                    "repo_id": chunk.repo_id,
                     "file_path": chunk.file_path,
                     "start_line": chunk.start_line,
                     "end_line": chunk.end_line,
@@ -231,6 +233,47 @@ class SearchService:
             logger.error(f"Failed to store embeddings: {str(e)}")
             raise
     
+    def delete_repository(self, repo_id: str) -> bool:
+        """Delete all indexed chunks belonging to one repository."""
+        if not repo_id:
+            raise ValueError("repo_id is required to delete repository documents")
+        if self.local_mode:
+            for document_id, (chunk, _) in list(_LOCAL_DOCUMENTS.items()):
+                if chunk.repo_id == repo_id:
+                    del _LOCAL_DOCUMENTS[document_id]
+            return True
+
+        filter_expression = self._repo_filter(repo_id)
+        documents = []
+        offset = 0
+        while True:
+            results = self.search_client.search(
+                search_text="*",
+                filter=filter_expression,
+                select=["id"],
+                top=1000,
+                skip=offset,
+            )
+            page = [{"id": result["id"]} for result in results]
+            documents.extend(page)
+            if len(page) < 1000:
+                break
+            offset += len(page)
+
+        for start in range(0, len(documents), 1000):
+            deleted = self.search_client.delete_documents(documents[start : start + 1000])
+            if not all(item.succeeded for item in deleted):
+                return False
+        return True
+
+    @staticmethod
+    def _repo_filter(repo_id: str, filters: Optional[str] = None) -> str:
+        if not repo_id:
+            raise ValueError("repo_id is required for scoped repository search")
+        safe_repo_id = repo_id.replace("'", "''")
+        repo_filter = f"repo_id eq '{safe_repo_id}'"
+        return f"({repo_filter}) and ({filters})" if filters else repo_filter
+
     def delete_index(self) -> bool:
         """
         Delete the Azure AI Search index.
@@ -250,8 +293,9 @@ class SearchService:
             logger.error(f"Failed to delete index {self.index_name}: {str(e)}")
             return False
     
-    def vector_search(self, query_embedding: List[float], top_k: int = 5, 
-                     filters: Optional[str] = None) -> List[SearchResult]:
+    def vector_search(self, query_embedding: List[float], top_k: int = 5,
+                     filters: Optional[str] = None,
+                     repo_id: Optional[str] = None) -> List[SearchResult]:
         """
         Perform vector similarity search against stored embeddings.
         
@@ -267,9 +311,14 @@ class SearchService:
             Exception: If search operation fails
         """
         try:
+            if not repo_id:
+                return []
+            scoped_filter = self._repo_filter(repo_id, filters)
             if self.local_mode:
                 scored = []
                 for chunk, vector in _LOCAL_DOCUMENTS.values():
+                    if chunk.repo_id != repo_id:
+                        continue
                     score = sum(a * b for a, b in zip(query_embedding, vector))
                     scored.append(SearchResult(chunk, score))
                 return sorted(scored, key=lambda result: result.score, reverse=True)[:top_k]
@@ -286,10 +335,10 @@ class SearchService:
             search_results = self.search_client.search(
                 search_text=None,
                 vector_queries=[vector_query],
-                filter=filters,
+                filter=scoped_filter,
                 top=top_k,
                 select=["id", "content", "file_path", "start_line", "end_line", 
-                       "language", "chunk_type"]
+                       "language", "chunk_type", "repo_id"]
             )
             
             # Convert results to SearchResult objects
@@ -304,6 +353,7 @@ class SearchService:
                     end_line=result["end_line"],
                     language=result["language"],
                     chunk_type=result["chunk_type"],
+                    repo_id=result["repo_id"],
                     metadata={}
                 )
                 
@@ -320,8 +370,9 @@ class SearchService:
             logger.error(f"Vector search failed: {str(e)}")
             raise
     
-    def search_by_text(self, query_text: str, top_k: int = 5, 
-                      filters: Optional[str] = None) -> List[SearchResult]:
+    def search_by_text(self, query_text: str, top_k: int = 5,
+                      filters: Optional[str] = None,
+                      repo_id: Optional[str] = None) -> List[SearchResult]:
         """
         Perform text-based search against stored content.
         
@@ -337,15 +388,18 @@ class SearchService:
             Exception: If search operation fails
         """
         try:
+            if not repo_id:
+                return []
+            scoped_filter = self._repo_filter(repo_id, filters)
             logger.debug(f"Performing text search for: '{query_text}' with top_k={top_k}")
             
             # Perform the search
             search_results = self.search_client.search(
                 search_text=query_text,
-                filter=filters,
+                filter=scoped_filter,
                 top=top_k,
                 select=["id", "content", "file_path", "start_line", "end_line", 
-                       "language", "chunk_type"]
+                       "language", "chunk_type", "repo_id"]
             )
             
             # Convert results to SearchResult objects
@@ -360,6 +414,7 @@ class SearchService:
                     end_line=result["end_line"],
                     language=result["language"],
                     chunk_type=result["chunk_type"],
+                    repo_id=result["repo_id"],
                     metadata={}
                 )
                 
@@ -376,8 +431,9 @@ class SearchService:
             logger.error(f"Text search failed: {str(e)}")
             raise
     
-    def hybrid_search(self, query_text: str, query_embedding: List[float], 
-                     top_k: int = 5, filters: Optional[str] = None) -> List[SearchResult]:
+    def hybrid_search(self, query_text: str, query_embedding: List[float],
+                     top_k: int = 5, filters: Optional[str] = None,
+                     repo_id: Optional[str] = None) -> List[SearchResult]:
         """
         Perform hybrid search combining text and vector similarity.
         
@@ -394,6 +450,9 @@ class SearchService:
             Exception: If search operation fails
         """
         try:
+            if not repo_id:
+                return []
+            scoped_filter = self._repo_filter(repo_id, filters)
             logger.debug(f"Performing hybrid search for: '{query_text}' with top_k={top_k}")
             
             # Create vectorized query
@@ -407,10 +466,10 @@ class SearchService:
             search_results = self.search_client.search(
                 search_text=query_text,
                 vector_queries=[vector_query],
-                filter=filters,
+                filter=scoped_filter,
                 top=top_k,
                 select=["id", "content", "file_path", "start_line", "end_line", 
-                       "language", "chunk_type"]
+                       "language", "chunk_type", "repo_id"]
             )
             
             # Convert results to SearchResult objects
@@ -425,6 +484,7 @@ class SearchService:
                     end_line=result["end_line"],
                     language=result["language"],
                     chunk_type=result["chunk_type"],
+                    repo_id=result["repo_id"],
                     metadata={}
                 )
                 
@@ -513,7 +573,16 @@ class SearchService:
         try:
             if self.local_mode:
                 return True
-            self.index_client.get_index(self.index_name)
+            index = self.index_client.get_index(self.index_name)
+            if not any(field.name == "repo_id" for field in index.fields):
+                index.fields.append(
+                    SimpleField(
+                        name="repo_id",
+                        type=SearchFieldDataType.String,
+                        filterable=True,
+                    )
+                )
+                self.index_client.create_or_update_index(index)
             return True
         except ResourceNotFoundError:
             return False

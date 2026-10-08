@@ -13,6 +13,7 @@ from typing import List, Set
 from urllib.parse import urlparse
 import logging
 from contextlib import asynccontextmanager
+import hashlib
 
 import git
 import requests
@@ -40,6 +41,9 @@ class RepositoryIngestionService:
     
     # Maximum file size in bytes (1MB)
     MAX_FILE_SIZE: int = 1024 * 1024
+    MAX_FILES: int = 250
+    MAX_REPOSITORY_SIZE: int = 10 * 1024 * 1024
+    MAX_CLONE_SIZE_KB: int = 25 * 1024
     SKIP_DIRS = {"node_modules", ".git", "build", "dist", "out", "target", "coverage", ".next", "vendor"}
     
     # Timeout for Git operations in seconds
@@ -47,6 +51,18 @@ class RepositoryIngestionService:
     
     def __init__(self):
         """Initialize the repository ingestion service."""
+
+    @staticmethod
+    def repo_id_for_source(source: str) -> str:
+        """Return a stable ID for a public repository URL or approved local fixture."""
+        if source.startswith("https://"):
+            parsed = urlparse(source)
+            parts = [part for part in parsed.path.split("/") if part]
+            repo_name = parts[1].removesuffix(".git") if len(parts) >= 2 else ""
+            canonical = f"https://github.com/{parts[0].lower()}/{repo_name.lower()}"
+        else:
+            canonical = str(Path(source.removeprefix("file://").strip()).resolve())
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
     
     async def ingest_repository(self, repo_url: str) -> IngestionResult:
         """
@@ -132,6 +148,7 @@ class RepositoryIngestionService:
         """
         code_files: List[CodeFile] = []
         repo_path_obj = Path(repo_path)
+        total_source_bytes = 0
         
         if not repo_path_obj.exists():
             logger.warning(f"Repository path does not exist: {repo_path}")
@@ -145,9 +162,18 @@ class RepositoryIngestionService:
                 if file_path.is_file() and self.validate_file_type(str(file_path)):
                     try:
                         # Skip files that are too large
-                        if file_path.stat().st_size > self.MAX_FILE_SIZE:
-                            logger.warning(f"Skipping large file: {file_path} ({file_path.stat().st_size} bytes)")
+                        file_size = file_path.stat().st_size
+                        if file_size > self.MAX_FILE_SIZE:
+                            logger.warning(f"Skipping large file: {file_path} ({file_size} bytes)")
                             continue
+                        if len(code_files) >= self.MAX_FILES:
+                            raise ValueError(
+                                f"Repository exceeds the {self.MAX_FILES}-file ingestion limit."
+                            )
+                        if total_source_bytes + file_size > self.MAX_REPOSITORY_SIZE:
+                            raise ValueError(
+                                "Repository exceeds the 10 MB source-size ingestion limit."
+                            )
                         
                         # Read file content
                         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -173,6 +199,7 @@ class RepositoryIngestionService:
                         )
                         
                         code_files.append(code_file)
+                        total_source_bytes += file_size
                         
                     except (UnicodeDecodeError, PermissionError) as e:
                         logger.warning(f"Could not read file {file_path}: {e}")
@@ -253,7 +280,16 @@ class RepositoryIngestionService:
                 api_url = f"https://api.github.com/repos/{owner}/{repo}"
                 
                 response = requests.get(api_url, timeout=10)
-                return response.status_code == 200
+                if response.status_code != 200:
+                    return False
+                from app.config import settings
+                if (
+                    settings.demo_mode
+                    and response.json().get("size", 0) > self.MAX_CLONE_SIZE_KB
+                ):
+                    logger.warning("Refusing demo repository above the clone-size limit")
+                    return False
+                return True
             
             return False
             
@@ -277,7 +313,7 @@ class RepositoryIngestionService:
             raise ValueError("Repository is not accessible; check the URL and ensure it is public")
         temp_dir = tempfile.mkdtemp(prefix="repo_ingestion_")
         try:
-            git.Repo.clone_from(repo_url, temp_dir, depth=1, timeout=self.GIT_TIMEOUT)
+            git.Repo.clone_from(repo_url, temp_dir, depth=1)
             yield await self.fetch_code_files(temp_dir)
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
@@ -302,8 +338,7 @@ class RepositoryIngestionService:
             repo = git.Repo.clone_from(
                 repo_url, 
                 temp_dir,
-                depth=1,  # Shallow clone for faster operation
-                timeout=self.GIT_TIMEOUT
+                depth=1  # Shallow clone for faster operation
             )
             
             logger.info(f"Repository cloned to: {temp_dir}")

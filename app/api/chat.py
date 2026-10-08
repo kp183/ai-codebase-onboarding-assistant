@@ -21,6 +21,7 @@ class ChatRequest(BaseModel):
     """Chat request model."""
     question: str = Field(..., min_length=1, description="User's question (cannot be empty)")
     session_id: Optional[str] = None
+    repo_id: Optional[str] = None
     
     @field_validator('question')
     @classmethod
@@ -62,7 +63,9 @@ async def process_chat_query(request: ChatRequest):
         service_manager = await get_service_manager()
         
         # Process the query through the complete pipeline
-        query_response = await service_manager.process_chat_query(request.question)
+        query_response = await service_manager.process_chat_query(
+            request.question, repo_id=request.repo_id
+        )
         
         # Convert to API response format
         response = ChatResponse(
@@ -82,27 +85,12 @@ async def process_chat_query(request: ChatRequest):
         
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to process chat query: {str(e)}"
+            detail="Chat request failed unexpectedly. Please try again.",
         )
 
 
-@router.get("/debug/service-status")
-async def debug_service_status():
-    """Debug endpoint to check service manager status."""
-    try:
-        service_manager = await get_service_manager()
-        return {
-            "service_manager_id": id(service_manager),
-            "initialized": service_manager._initialized,
-            "services_healthy": service_manager._services_healthy,
-            "last_health_check": service_manager._last_health_check.isoformat() if service_manager._last_health_check else None
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
-
 @router.get("/predefined/where-to-start", response_model=ChatResponse)
-async def where_to_start():
+async def where_to_start(repo_id: Optional[str] = None):
     """
     Predefined query: "Where do I start?"
     Provides codebase overview and entry points for new developers.
@@ -125,7 +113,9 @@ async def where_to_start():
         
         # Process the predefined query
         logger.info("Calling service manager to process predefined query...")
-        query_response = await service_manager.process_predefined_query("where-to-start")
+        query_response = await service_manager.process_predefined_query(
+            "where-to-start", repo_id=repo_id
+        )
         
         # Calculate processing time
         processing_time_ms = int((time.time() - start_time) * 1000)
@@ -148,5 +138,5 @@ async def where_to_start():
         
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to process predefined query: {str(e)}"
+            detail="Predefined query failed unexpectedly. Please try again.",
         )

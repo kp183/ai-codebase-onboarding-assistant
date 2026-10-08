@@ -48,15 +48,15 @@
                                     <span class="btn-icon">🚀</span>
                                     Where do I start?
                                 </button>
-                                <button class="predefined-btn" onclick="chatApp.askDemoQuestion('How do I run this application?')">
+                                <button class="predefined-btn" data-demo-question="How do I run this application?">
                                     <span class="btn-icon">▶️</span>
                                     How to run?
                                 </button>
-                                <button class="predefined-btn" onclick="chatApp.askDemoQuestion('What are the main API endpoints?')">
+                                <button class="predefined-btn" data-demo-question="What are the main API endpoints?">
                                     <span class="btn-icon">🔗</span>
                                     API endpoints?
                                 </button>
-                                <button class="predefined-btn" onclick="chatApp.askDemoQuestion('Explain the architecture and main components')">
+                                <button class="predefined-btn" data-demo-question="Explain the architecture and main components">
                                     <span class="btn-icon">🏗️</span>
                                     Architecture?
                                 </button>
@@ -68,7 +68,7 @@
                             <h4>📁 Analyze Your Repository</h4>
                             <div class="repo-input-container">
                                 <input type="url" id="repo-url" placeholder="Enter GitHub repository URL..." class="repo-input">
-                                <button class="repo-analyze-btn" onclick="chatApp.handleRepoInput()">
+                                <button class="repo-analyze-btn">
                                     <span class="btn-icon">🔍</span>
                                     Analyze
                                 </button>
