@@ -7,6 +7,7 @@ class ChatApp {
         this.chatInput = document.getElementById('chat-input');
         this.sendBtn = document.getElementById('send-btn');
         this.whereToStartBtn = document.getElementById('where-to-start-btn');
+        this.repoAnalyzeBtn = document.querySelector('.repo-analyze-btn');
         this.errorDisplay = document.getElementById('error-display');
         this.repoId = null;
         
@@ -17,6 +18,10 @@ class ChatApp {
     initializeEventListeners() {
         this.chatForm.addEventListener('submit', (e) => this.handleChatSubmit(e));
         this.whereToStartBtn.addEventListener('click', () => this.handleWhereToStart());
+        this.repoAnalyzeBtn.addEventListener('click', () => this.handleRepoInput());
+        document.querySelectorAll('[data-demo-question]').forEach((button) => {
+            button.addEventListener('click', () => this.askDemoQuestion(button.dataset.demoQuestion));
+        });
         
         // Auto-resize input and handle enter key
         this.chatInput.addEventListener('keydown', (e) => {
@@ -127,13 +132,17 @@ class ChatApp {
     addErrorMessage(errorText) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message error';
-        messageDiv.innerHTML = `
-            <div class="message-content">
-                <span class="error-icon">⚠️</span>
-                ${this.escapeHtml(errorText)}
-                <button class="retry-btn" onclick="chatApp.retryLastRequest()">Try Again</button>
-            </div>
-        `;
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        const icon = document.createElement('span');
+        icon.className = 'error-icon';
+        icon.textContent = '⚠️';
+        const retry = document.createElement('button');
+        retry.className = 'retry-btn';
+        retry.textContent = 'Try Again';
+        retry.addEventListener('click', () => this.retryLastRequest());
+        content.append(icon, document.createTextNode(` ${errorText} `), retry);
+        messageDiv.appendChild(content);
         this.chatMessages.appendChild(messageDiv);
         this.scrollToBottom();
     }
@@ -187,9 +196,11 @@ class ChatApp {
     addSystemMessage(message) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message system';
-        messageDiv.innerHTML = `
-            <div class="message-content">${this.escapeHtml(message).replace(/\n/g, '<br>')}</div>
-        `;
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        content.textContent = message;
+        content.style.whiteSpace = 'pre-wrap';
+        messageDiv.appendChild(content);
         this.chatMessages.appendChild(messageDiv);
         this.scrollToBottom();
     }
@@ -214,9 +225,11 @@ class ChatApp {
     addUserMessage(message) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message user';
-        messageDiv.innerHTML = `
-            <div class="message-content">${this.escapeHtml(message)}</div>
-        `;
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        content.textContent = message;
+        content.style.whiteSpace = 'pre-wrap';
+        messageDiv.appendChild(content);
         this.chatMessages.appendChild(messageDiv);
         this.scrollToBottom();
     }
@@ -224,38 +237,55 @@ class ChatApp {
     addAssistantMessage(response) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message assistant';
-        
-        let sourcesHtml = '';
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        messageContent.textContent = response.answer || '';
+        messageContent.style.whiteSpace = 'pre-wrap';
+        messageDiv.appendChild(messageContent);
+
         if (response.sources && response.sources.length > 0) {
-            sourcesHtml = `
-                <div class="sources">
-                    <h4>📁 Source References (${response.sources.length})</h4>
-                    ${response.sources.map((source, index) => `
-                        <div class="source-ref" onclick="copyToClipboard('${source.file_path}:${source.start_line}-${source.end_line}')" data-source-index="${index}">
-                            <span class="file-icon">📄</span>
-                            <span class="file-path" title="${source.file_path}">${this.truncateFilePath(source.file_path)}</span>
-                            <span class="line-numbers">${source.start_line}-${source.end_line}</span>
-                            <div class="source-ref-tooltip">Click to copy file reference</div>
-                        </div>
-                    `).join('')}
-                    <div class="sources-note">
-                        <small>💡 Click any reference to copy the file path and line numbers</small>
-                    </div>
-                </div>
-            `;
+            const sources = document.createElement('div');
+            sources.className = 'sources';
+            const heading = document.createElement('h4');
+            heading.textContent = `📁 Source References (${response.sources.length})`;
+            sources.appendChild(heading);
+            response.sources.forEach((source) => {
+                const reference = document.createElement('div');
+                reference.className = 'source-ref';
+                const icon = document.createElement('span');
+                icon.className = 'file-icon';
+                icon.textContent = '📄';
+                const path = document.createElement('span');
+                path.className = 'file-path';
+                path.title = source.file_path;
+                path.textContent = this.truncateFilePath(source.file_path);
+                const lines = document.createElement('span');
+                lines.className = 'line-numbers';
+                lines.textContent = `${source.start_line}-${source.end_line}`;
+                const tooltip = document.createElement('div');
+                tooltip.className = 'source-ref-tooltip';
+                tooltip.textContent = 'Click to copy file reference';
+                reference.append(icon, path, lines, tooltip);
+                reference.addEventListener('click', () => {
+                    copyToClipboard(`${source.file_path}:${source.start_line}-${source.end_line}`);
+                });
+                sources.appendChild(reference);
+            });
+            const note = document.createElement('div');
+            note.className = 'sources-note';
+            const small = document.createElement('small');
+            small.textContent = '💡 Click any reference to copy the file path and line numbers';
+            note.appendChild(small);
+            sources.appendChild(note);
+            messageDiv.appendChild(sources);
         } else {
-            // Show a message when there are no sources
-            sourcesHtml = `
-                <div class="no-sources">
-                    <small>ℹ️ No specific source references found for this response</small>
-                </div>
-            `;
+            const noSources = document.createElement('div');
+            noSources.className = 'no-sources';
+            const small = document.createElement('small');
+            small.textContent = 'ℹ️ No specific source references found for this response';
+            noSources.appendChild(small);
+            messageDiv.appendChild(noSources);
         }
-        
-        messageDiv.innerHTML = `
-            <div class="message-content">${this.formatMessageContent(response.answer)}</div>
-            ${sourcesHtml}
-        `;
         
         this.chatMessages.appendChild(messageDiv);
         this.scrollToBottom();
@@ -284,14 +314,16 @@ class ChatApp {
         const typingDiv = document.createElement('div');
         typingDiv.className = 'typing-indicator';
         typingDiv.id = 'typing-indicator';
-        typingDiv.innerHTML = `
-            <span>AI is thinking</span>
-            <div class="typing-dots">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
-        `;
+        const label = document.createElement('span');
+        label.textContent = 'AI is thinking';
+        const dots = document.createElement('div');
+        dots.className = 'typing-dots';
+        for (let index = 0; index < 3; index += 1) {
+            const dot = document.createElement('div');
+            dot.className = 'typing-dot';
+            dots.appendChild(dot);
+        }
+        typingDiv.append(label, dots);
         this.chatMessages.appendChild(typingDiv);
         this.scrollToBottom();
     }
@@ -310,16 +342,6 @@ class ChatApp {
     
     hideError() {
         this.errorDisplay.style.display = 'none';
-    }
-    
-    addErrorMessage(message) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'error-message';
-        messageDiv.innerHTML = `
-            <strong>⚠️ Error:</strong> ${this.escapeHtml(message)}
-        `;
-        this.chatMessages.appendChild(messageDiv);
-        this.scrollToBottom();
     }
     
     setLoading(isLoading) {
@@ -344,20 +366,6 @@ class ChatApp {
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
     }
     
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-    
-    formatMessageContent(text) {
-        // Basic formatting for better readability
-        return this.escapeHtml(text)
-            .replace(/\n\n/g, '</p><p>')
-            .replace(/\n/g, '<br>')
-            .replace(/^/, '<p>')
-            .replace(/$/, '</p>');
-    }
 }
 
 // Utility function for copying source references
