@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 
 from app.config import settings
+from app.middleware import RequestLimitsMiddleware
 from app.api import chat, health, ingestion
 from app.services.service_manager import service_manager
 
@@ -77,6 +78,14 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
+)
+app.add_middleware(
+    RequestLimitsMiddleware,
+    max_body_bytes=settings.max_request_bytes,
+    route_limits={
+        "/api/ingest": settings.ingest_requests_per_minute,
+        "/api/chat": settings.chat_requests_per_minute,
+    },
 )
 
 # Include API routers

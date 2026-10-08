@@ -85,7 +85,7 @@ async def process_chat_query(request: ChatRequest):
         
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to process chat query: {str(e)}"
+            detail="Chat request failed unexpectedly. Please try again.",
         )
 
 
@@ -138,5 +138,5 @@ async def where_to_start(repo_id: Optional[str] = None):
         
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to process predefined query: {str(e)}"
+            detail="Predefined query failed unexpectedly. Please try again.",
         )

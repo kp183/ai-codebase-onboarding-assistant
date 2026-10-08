@@ -75,7 +75,7 @@ async def detailed_health_check():
             timestamp=datetime.utcnow(),
             version=settings.app_version,
             service=settings.app_name,
-            services={"error": str(e)},
+            services={"status": "unavailable"},
             initialized=False
         )
 
@@ -93,6 +93,6 @@ async def system_stats():
         return await service_manager.get_system_stats()
     except Exception as e:
         return {
-            "error": str(e),
+            "error": "Health statistics unavailable",
             "timestamp": datetime.utcnow().isoformat()
         }

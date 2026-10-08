@@ -233,6 +233,16 @@ class ServiceManager:
                         errors=["No indexable chunks found"]
                     )
 
+                if len(all_chunks) > settings.max_chunks_per_repo:
+                    return IngestionResult(
+                        success=False,
+                        file_count=len(code_files),
+                        message=(
+                            f"Repository exceeds the {settings.max_chunks_per_repo}-chunk ingestion limit."
+                        ),
+                        processed_files=[file.file_path for file in code_files],
+                    )
+
                 for index, chunk in enumerate(all_chunks):
                     chunk.repo_id = repo_id
                     chunk.id = hashlib.sha256(

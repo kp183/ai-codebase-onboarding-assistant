@@ -63,7 +63,7 @@ async def ingest_repository(request: IngestionRequest):
         logger.error(f"Unexpected error during repository ingestion pipeline: {e}")
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail="Ingestion failed unexpectedly. Check the URL and configured limits.",
         )
 
 

@@ -15,6 +15,10 @@ class Settings(BaseSettings):
         "http://localhost:8000,http://127.0.0.1:8000,"
         "http://localhost:8002,http://127.0.0.1:8002"
     )
+    max_request_bytes: int = 65536
+    max_chunks_per_repo: int = 5000
+    ingest_requests_per_minute: int = 10
+    chat_requests_per_minute: int = 30
     azure_openai_endpoint: str = ""
     azure_openai_api_key: str = ""
     azure_openai_api_version: str = "2024-12-01-preview"
