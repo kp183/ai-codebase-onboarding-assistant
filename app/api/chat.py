@@ -89,21 +89,6 @@ async def process_chat_query(request: ChatRequest):
         )
 
 
-@router.get("/debug/service-status")
-async def debug_service_status():
-    """Debug endpoint to check service manager status."""
-    try:
-        service_manager = await get_service_manager()
-        return {
-            "service_manager_id": id(service_manager),
-            "initialized": service_manager._initialized,
-            "services_healthy": service_manager._services_healthy,
-            "last_health_check": service_manager._last_health_check.isoformat() if service_manager._last_health_check else None
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
-
 @router.get("/predefined/where-to-start", response_model=ChatResponse)
 async def where_to_start(repo_id: Optional[str] = None):
     """

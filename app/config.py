@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     debug: bool = False
     log_level: str = "INFO"
     demo_mode: bool = False
+    cors_allowed_origins: str = (
+        "http://localhost:8000,http://127.0.0.1:8000,"
+        "http://localhost:8002,http://127.0.0.1:8002"
+    )
     azure_openai_endpoint: str = ""
     azure_openai_api_key: str = ""
     azure_openai_api_version: str = "2024-12-01-preview"
