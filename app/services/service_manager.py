@@ -207,6 +207,7 @@ class ServiceManager:
             if not self._initialized and not await self.initialize_services():
                 raise RuntimeError("Services could not be initialized")
             
+            repo_id = repository_service.repo_id_for_source(repo_url)
             async with repository_service.repository_files(repo_url) as code_files:
                 if not code_files:
                     return IngestionResult(
@@ -233,7 +234,10 @@ class ServiceManager:
                     )
 
                 for index, chunk in enumerate(all_chunks):
-                    chunk.id = hashlib.sha256(f"{repo_url.rstrip('/').removesuffix('.git')}:{chunk.file_path}:{index}".encode()).hexdigest()
+                    chunk.repo_id = repo_id
+                    chunk.id = hashlib.sha256(
+                        f"{repo_id}:{chunk.file_path}:{index}".encode()
+                    ).hexdigest()
             
                 # Step 4: Generate embeddings
                 logger.info(f"Generating embeddings for {len(all_chunks)} chunks...")
@@ -241,6 +245,8 @@ class ServiceManager:
             
                 # Step 5: Store in search index
                 logger.info("Storing embeddings in search index...")
+                if not self.search_service.delete_repository(repo_id):
+                    raise RuntimeError("Could not replace existing repository chunks")
                 storage_success = self.search_service.store_embeddings(embedded_chunks)
             
                 if storage_success:
@@ -248,6 +254,7 @@ class ServiceManager:
                         success=True,
                         file_count=len(code_files),
                         chunks_indexed=len(embedded_chunks),
+                        repo_id=repo_id,
                         message=f"Successfully processed {len(code_files)} files and created {len(embedded_chunks)} searchable chunks",
                         processed_files=[f.file_path for f in code_files]
                     )
@@ -269,7 +276,9 @@ class ServiceManager:
                 errors=[f"Pipeline error: {str(e)}"]
             )
     
-    async def process_chat_query(self, question: str) -> QueryResponse:
+    async def process_chat_query(
+        self, question: str, repo_id: Optional[str] = None
+    ) -> QueryResponse:
         """
         Process a chat query and return a response using the full search pipeline.
         
@@ -289,7 +298,9 @@ class ServiceManager:
             logger.info(f"Processing chat query with search: '{question[:100]}...'")
             
             # Use the actual query processing service for search-based responses
-            query_response = await self.query_processing_service.process_query(question)
+            query_response = await self.query_processing_service.process_query(
+                question, repo_id=repo_id
+            )
             
             logger.info(f"Chat query processed successfully with {len(query_response.sources)} sources")
             return query_response
@@ -354,7 +365,9 @@ Keep it professional and helpful, but mention this is a demo response."""
             logger.error(f"Demo chat processing failed: {str(e)}")
             raise
     
-    async def process_predefined_query(self, query_type: str) -> QueryResponse:
+    async def process_predefined_query(
+        self, query_type: str, repo_id: Optional[str] = None
+    ) -> QueryResponse:
         """
         Process a predefined query using the full search pipeline.
         
@@ -366,7 +379,9 @@ Keep it professional and helpful, but mention this is a demo response."""
         """
         logger.info(f"Processing predefined query: {query_type}")
         if settings.demo_mode and query_type == "where-to-start":
-            return await self.process_chat_query("Where should a new developer start in this repository?")
+            return await self.process_chat_query(
+                "Where should a new developer start in this repository?", repo_id=repo_id
+            )
         logger.info(f"Service manager initialized: {self._initialized}")
         
         if not self._initialized:
@@ -382,7 +397,7 @@ Keep it professional and helpful, but mention this is a demo response."""
                 logger.info("Processing 'where-to-start' query with search functionality")
                 
                 # Use the predefined query service for search-based responses
-                query_response = await self.predefined_query_service.where_do_i_start()
+                query_response = await self.predefined_query_service.where_do_i_start(repo_id)
                 
                 logger.info(f"Predefined query processed successfully with {len(query_response.sources)} sources")
                 return query_response

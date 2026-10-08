@@ -13,6 +13,7 @@ from typing import List, Set
 from urllib.parse import urlparse
 import logging
 from contextlib import asynccontextmanager
+import hashlib
 
 import git
 import requests
@@ -49,6 +50,18 @@ class RepositoryIngestionService:
     
     def __init__(self):
         """Initialize the repository ingestion service."""
+
+    @staticmethod
+    def repo_id_for_source(source: str) -> str:
+        """Return a stable ID for a public repository URL or approved local fixture."""
+        if source.startswith("https://"):
+            parsed = urlparse(source)
+            parts = [part for part in parsed.path.split("/") if part]
+            repo_name = parts[1].removesuffix(".git") if len(parts) >= 2 else ""
+            canonical = f"https://github.com/{parts[0].lower()}/{repo_name.lower()}"
+        else:
+            canonical = str(Path(source.removeprefix("file://").strip()).resolve())
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
     
     async def ingest_repository(self, repo_url: str) -> IngestionResult:
         """

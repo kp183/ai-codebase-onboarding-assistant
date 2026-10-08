@@ -43,6 +43,7 @@ class CodeChunk(BaseModel):
         metadata: Additional metadata about the chunk
     """
     id: str = Field(..., description="Unique identifier for the chunk")
+    repo_id: str = Field(default="", description="Stable identifier for the source repository")
     file_path: str = Field(..., description="Path to the source file")
     content: str = Field(..., description="Text content of the chunk")
     start_line: int = Field(..., ge=1, description="Starting line number in the source file")
@@ -142,6 +143,7 @@ class IngestionResult(BaseModel):
     success: bool = Field(..., description="Whether the ingestion was successful")
     file_count: int = Field(..., ge=0, description="Number of files processed")
     chunks_indexed: int = Field(default=0, ge=0, description="Number of searchable chunks stored")
+    repo_id: Optional[str] = Field(default=None, description="Stable identifier for the indexed repository")
     message: str = Field(..., description="Descriptive message about the result")
     processed_files: List[str] = Field(
         default_factory=list, 

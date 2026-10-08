@@ -52,7 +52,9 @@ class QueryProcessingService:
         self.embedding_service = get_embedding_service()
         self.search_service = get_search_service()
     
-    async def process_query(self, user_question: str, top_k: int = 5) -> QueryResponse:
+    async def process_query(
+        self, user_question: str, top_k: int = 5, repo_id: Optional[str] = None
+    ) -> QueryResponse:
         """
         Process a user query and generate a grounded response.
         
@@ -70,9 +72,19 @@ class QueryProcessingService:
         
         try:
             logger.info(f"Processing query: '{user_question[:100]}...'")
+
+            if not repo_id:
+                return QueryResponse(
+                    answer="No repository selected. Ingest a repository before asking questions.",
+                    sources=[],
+                    confidence_score=0.0,
+                    processing_time_ms=int((time.time() - start_time) * 1000),
+                )
             
             # Step 1: Retrieve relevant code chunks
-            relevant_chunks = await self.retrieve_relevant_chunks(user_question, top_k)
+            relevant_chunks = await self.retrieve_relevant_chunks(
+                user_question, top_k, repo_id=repo_id
+            )
 
             if self.local_mode:
                 query_terms = set(
@@ -125,7 +137,9 @@ class QueryProcessingService:
             logger.error(f"Failed to process query: {str(e)}")
             raise
     
-    async def retrieve_relevant_chunks(self, query: str, top_k: int = 5) -> List[SearchResult]:
+    async def retrieve_relevant_chunks(
+        self, query: str, top_k: int = 5, repo_id: Optional[str] = None
+    ) -> List[SearchResult]:
         """
         Retrieve relevant code chunks for a given query.
         
@@ -148,7 +162,8 @@ class QueryProcessingService:
             # Perform vector similarity search
             search_results = self.search_service.vector_search(
                 query_embedding=query_embedding,
-                top_k=top_k
+                top_k=top_k,
+                repo_id=repo_id,
             )
             
             logger.debug(f"Retrieved {len(search_results)} relevant chunks")

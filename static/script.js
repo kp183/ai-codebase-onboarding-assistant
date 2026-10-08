@@ -8,6 +8,7 @@ class ChatApp {
         this.sendBtn = document.getElementById('send-btn');
         this.whereToStartBtn = document.getElementById('where-to-start-btn');
         this.errorDisplay = document.getElementById('error-display');
+        this.repoId = null;
         
         this.isProcessing = false;
         this.initializeEventListeners();
@@ -80,7 +81,8 @@ class ChatApp {
         this.showTypingIndicator();
         
         try {
-            const response = await fetch('/api/predefined/where-to-start');
+            const query = this.repoId ? `?repo_id=${encodeURIComponent(this.repoId)}` : '';
+            const response = await fetch(`/api/predefined/where-to-start${query}`);
             
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -166,6 +168,7 @@ class ChatApp {
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.detail || `Ingestion failed (${response.status})`);
+            this.repoId = data.repo_id;
             const stats = document.querySelectorAll('.stats-bar .stat-value');
             if (stats.length >= 3) {
                 stats[0].textContent = 'ingested';
@@ -197,7 +200,7 @@ class ChatApp {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ question })
+            body: JSON.stringify({ question, repo_id: this.repoId })
         });
         
         if (!response.ok) {
