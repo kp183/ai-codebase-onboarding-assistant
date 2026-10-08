@@ -113,10 +113,11 @@ def test_demo_not_found_uses_score_threshold_not_exact_term_match(monkeypatch):
     service = QueryProcessingService.__new__(QueryProcessingService)
     service.local_mode = True
     service._initialized = True
+    service.embedding_service = SimpleNamespace(use_local_embeddings=True)
     monkeypatch.setattr(settings, "demo_mode", True)
 
     async def retrieve(question, top_k, repo_id=None):
-        return [SearchResult(chunk, 0.31)]
+        return [SearchResult(chunk, 0.42)]
 
     service.retrieve_relevant_chunks = retrieve
     response = asyncio.run(
@@ -140,10 +141,72 @@ def test_demo_not_found_threshold_rejects_weak_results():
     service = QueryProcessingService.__new__(QueryProcessingService)
     service.local_mode = True
     service._initialized = True
+    service.embedding_service = SimpleNamespace(use_local_embeddings=True)
 
     async def retrieve(question, top_k, repo_id=None):
         return [SearchResult(chunk, 0.05)]
 
     service.retrieve_relevant_chunks = retrieve
     response = asyncio.run(service.process_query("Tell me about the deployment", repo_id="repo"))
+    assert "Not found in repo" in response.answer
+
+
+def test_demo_not_found_threshold_rejects_unrelated_midrange_match():
+    chunk = CodeChunk(
+        id="chunk",
+        repo_id="repo",
+        file_path="src/werkzeug/security.py",
+        content="def generate_password_hash(password): pass",
+        start_line=1,
+        end_line=1,
+        language="python",
+        chunk_type="function",
+    )
+    service = QueryProcessingService.__new__(QueryProcessingService)
+    service.local_mode = True
+    service._initialized = True
+    service.embedding_service = SimpleNamespace(use_local_embeddings=True)
+
+    async def retrieve(question, top_k, repo_id=None):
+        return [SearchResult(chunk, 0.30)]
+
+    service.retrieve_relevant_chunks = retrieve
+    response = asyncio.run(
+        service.process_query(
+            "How does it send password reset emails through SendGrid?", repo_id="repo"
+        )
+    )
+    assert "Not found in repo" in response.answer
+
+
+def test_demo_not_found_uses_average_of_top_three_scores():
+    chunks = [
+        CodeChunk(
+            id=f"chunk-{index}",
+            repo_id="repo",
+            file_path=f"src/file_{index}.py",
+            content="unrelated result",
+            start_line=1,
+            end_line=1,
+            language="python",
+            chunk_type="function",
+        )
+        for index in range(3)
+    ]
+    service = QueryProcessingService.__new__(QueryProcessingService)
+    service.local_mode = True
+    service._initialized = True
+    service.embedding_service = SimpleNamespace(use_local_embeddings=True)
+
+    async def retrieve(question, top_k, repo_id=None):
+        return [
+            SearchResult(chunks[0], 0.80),
+            SearchResult(chunks[1], 0.10),
+            SearchResult(chunks[2], 0.10),
+        ]
+
+    service.retrieve_relevant_chunks = retrieve
+    response = asyncio.run(
+        service.process_query("Where is a fictional feature implemented?", repo_id="repo")
+    )
     assert "Not found in repo" in response.answer

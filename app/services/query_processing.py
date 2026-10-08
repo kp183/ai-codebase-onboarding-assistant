@@ -18,6 +18,8 @@ from app.services.embedding_service import get_embedding_service
 from app.services.search_service import get_search_service, SearchResult
 
 logger = logging.getLogger(__name__)
+MIN_DEMO_RELEVANCE_SCORE = 0.35
+MIN_DEMO_KEYWORD_SCORE = 0.18
 
 
 class QueryProcessingService:
@@ -88,7 +90,27 @@ class QueryProcessingService:
             )
 
             if self.local_mode:
-                if not relevant_chunks or relevant_chunks[0].score < 0.18:
+                relevance_candidates = relevant_chunks[:3]
+                use_local_embeddings = getattr(
+                    self.embedding_service, "use_local_embeddings", False
+                )
+                if use_local_embeddings:
+                    relevance_score = (
+                        sum(result.score for result in relevance_candidates)
+                        / len(relevance_candidates)
+                        if relevance_candidates
+                        else 0.0
+                    )
+                    min_score = MIN_DEMO_RELEVANCE_SCORE
+                else:
+                    relevance_score = (
+                        relevance_candidates[0].score if relevance_candidates else 0.0
+                    )
+                    min_score = MIN_DEMO_KEYWORD_SCORE
+                if (
+                    not relevance_candidates
+                    or relevance_score < min_score
+                ):
                     answer = "Not found in repo. I could not retrieve code chunks with enough matching content to answer this question."
                     relevant_chunks = []
                 else:

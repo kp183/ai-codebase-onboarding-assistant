@@ -44,6 +44,21 @@
         {"question": "Where does the HTTP adapter configure connection and read timeouts?", "expected_file": "src/requests/adapters.py"},
         {"question": "How can a session construct a PreparedRequest using session defaults?", "expected_file": "src/requests/sessions.py"}
       ]
+    },
+    "werkzeug": {
+      "source": "https://github.com/pallets/werkzeug",
+      "questions": [
+        {"question": "How does Werkzeug wrap a WSGI environment into a request object?", "expected_file": "src/werkzeug/wrappers/request.py", "answerable": true},
+        {"question": "Where are incoming paths matched against URL rules and route variables?", "expected_file": "src/werkzeug/routing/map.py", "answerable": true},
+        {"question": "How is the response body and status turned into WSGI output?", "expected_file": "src/werkzeug/wrappers/response.py", "answerable": true},
+        {"question": "How can query parameters keep multiple values for the same key?", "expected_file": "src/werkzeug/datastructures/structures.py", "answerable": true},
+        {"question": "Where does Werkzeug parse multipart form data and uploaded files?", "expected_file": "src/werkzeug/formparser.py", "answerable": true},
+        {"question": "Where does this project create Stripe charges during customer checkout?", "expected_file": null, "answerable": false},
+        {"question": "How does the app send password reset emails through SendGrid?", "expected_file": null, "answerable": false},
+        {"question": "Where are PostgreSQL schema migrations run for shopping carts?", "expected_file": null, "answerable": false},
+        {"question": "Which Kubernetes manifest configures production autoscaling?", "expected_file": null, "answerable": false},
+        {"question": "How does the application calculate sales tax for product orders?", "expected_file": null, "answerable": false}
+      ]
     }
   }
 }
