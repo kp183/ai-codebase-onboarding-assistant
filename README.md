@@ -16,18 +16,18 @@ python run_dev.py
 
 Open http://127.0.0.1:8002. The included `tests/fixtures/sample_repo` can be ingested through `POST /api/ingest` by passing its absolute local path as `repository_url` in demo mode. The browser UI accepts public GitHub HTTPS URLs. After ingesting, ask about symbols or behavior in the repository.
 
-Demo mode uses deterministic local feature-hash embeddings and an in-memory vector store. It returns retrieved snippets as a clearly labeled retrieval-only answer; if nothing relevant is retrieved it says “Not found in repo.” Data is lost when the process stops. This is a local demo, not a multi-user or private-repository deployment.
+Demo mode uses an in-memory store and BM25-style keyword retrieval by default. For local semantic embeddings, install `requirements-local.txt`, set `LOCAL_EMBEDDINGS=true`, and restart. FastEmbed downloads the selected model the first time it runs; inference then runs locally. Retrieved snippets are returned as a clearly labeled retrieval-only answer, with “Not found in repo” when the best relevance score is below the guard threshold. Data is lost when the process stops. This is a local demo, not a multi-user or private-repository deployment.
 
 ## What is implemented
 
-- GitHub public repository clone, supported source-file filtering, chunking, embeddings, and indexed retrieval.
+- Public GitHub repository clone, source filtering, chunking, BM25 retrieval, and optional local semantic embeddings.
 - Local fixture ingestion and retrieval without Azure credentials when `DEMO_MODE=true`.
 - Browser form for repository ingestion and chat with source file/line references.
 
 ## Not implemented / limitations
 
 - Azure mode requires configured Azure OpenAI and Azure AI Search resources; it has not been validated here.
-- Local demo embeddings are deterministic feature hashing, not semantic model embeddings. Answers are retrieved snippets, not generated explanations.
+- Local semantic embeddings are optional and require a one-time model download; without them, demo retrieval uses BM25-style keyword scoring. The demo returns retrieved snippets and does not generate explanations.
 - No authentication, tenant isolation, persistent local index, background jobs, or production deployment controls.
 - The local demo only permits ingesting the checked-in fixture path. The browser flow ingests public GitHub HTTPS repositories.
 
