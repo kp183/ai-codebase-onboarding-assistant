@@ -68,6 +68,39 @@ def test_azure_search_mode_scopes_upload_search_and_delete(monkeypatch):
     assert any(field.name == "repo_id" and field.filterable for field in fields)
 
 
+def test_azure_delete_repository_pages_through_all_chunks(monkeypatch):
+    monkeypatch.setattr(settings, "demo_mode", False)
+    search_client = Mock()
+    monkeypatch.setattr(search_module, "AzureKeyCredential", lambda key: "mock-credential")
+    monkeypatch.setattr(search_module, "SearchIndexClient", lambda **kwargs: Mock())
+    monkeypatch.setattr(search_module, "SearchClient", lambda **kwargs: search_client)
+    search_client.search.side_effect = [
+        [{"id": f"chunk-{index}"} for index in range(1000)],
+        [{"id": f"chunk-{index}"} for index in range(1000, 2000)],
+        [],
+    ]
+    search_client.delete_documents.return_value = [SimpleNamespace(succeeded=True)] * 1000
+
+    assert search_module.SearchService().delete_repository("repo-a") is True
+    assert [call.kwargs["skip"] for call in search_client.search.call_args_list] == [0, 1000, 2000]
+    assert [len(call.args[0]) for call in search_client.delete_documents.call_args_list] == [1000, 1000]
+
+
+def test_existing_azure_index_gets_filterable_repo_id_field(monkeypatch):
+    monkeypatch.setattr(settings, "demo_mode", False)
+    index_client = Mock()
+    monkeypatch.setattr(search_module, "AzureKeyCredential", lambda key: "mock-credential")
+    monkeypatch.setattr(search_module, "SearchIndexClient", lambda **kwargs: index_client)
+    monkeypatch.setattr(search_module, "SearchClient", lambda **kwargs: Mock())
+    existing_index = SimpleNamespace(fields=[])
+    index_client.get_index.return_value = existing_index
+
+    assert search_module.SearchService().index_exists() is True
+    assert existing_index.fields[0].name == "repo_id"
+    assert existing_index.fields[0].filterable is True
+    index_client.create_or_update_index.assert_called_once_with(existing_index)
+
+
 @pytest.mark.asyncio
 async def test_azure_embedding_mode_calls_mocked_client(monkeypatch):
     monkeypatch.setattr(settings, "demo_mode", False)

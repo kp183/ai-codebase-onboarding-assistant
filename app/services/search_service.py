@@ -243,17 +243,28 @@ class SearchService:
                     del _LOCAL_DOCUMENTS[document_id]
             return True
 
-        results = self.search_client.search(
-            search_text="*",
-            filter=self._repo_filter(repo_id),
-            select=["id"],
-            top=1000,
-        )
-        documents = [{"id": result["id"]} for result in results]
-        if not documents:
-            return True
-        deleted = self.search_client.delete_documents(documents)
-        return all(item.succeeded for item in deleted)
+        filter_expression = self._repo_filter(repo_id)
+        documents = []
+        offset = 0
+        while True:
+            results = self.search_client.search(
+                search_text="*",
+                filter=filter_expression,
+                select=["id"],
+                top=1000,
+                skip=offset,
+            )
+            page = [{"id": result["id"]} for result in results]
+            documents.extend(page)
+            if len(page) < 1000:
+                break
+            offset += len(page)
+
+        for start in range(0, len(documents), 1000):
+            deleted = self.search_client.delete_documents(documents[start : start + 1000])
+            if not all(item.succeeded for item in deleted):
+                return False
+        return True
 
     @staticmethod
     def _repo_filter(repo_id: str, filters: Optional[str] = None) -> str:
@@ -562,7 +573,16 @@ class SearchService:
         try:
             if self.local_mode:
                 return True
-            self.index_client.get_index(self.index_name)
+            index = self.index_client.get_index(self.index_name)
+            if not any(field.name == "repo_id" for field in index.fields):
+                index.fields.append(
+                    SimpleField(
+                        name="repo_id",
+                        type=SearchFieldDataType.String,
+                        filterable=True,
+                    )
+                )
+                self.index_client.create_or_update_index(index)
             return True
         except ResourceNotFoundError:
             return False
