@@ -43,6 +43,7 @@ class RepositoryIngestionService:
     MAX_FILE_SIZE: int = 1024 * 1024
     MAX_FILES: int = 250
     MAX_REPOSITORY_SIZE: int = 10 * 1024 * 1024
+    MAX_CLONE_SIZE_KB: int = 25 * 1024
     SKIP_DIRS = {"node_modules", ".git", "build", "dist", "out", "target", "coverage", ".next", "vendor"}
     
     # Timeout for Git operations in seconds
@@ -279,7 +280,16 @@ class RepositoryIngestionService:
                 api_url = f"https://api.github.com/repos/{owner}/{repo}"
                 
                 response = requests.get(api_url, timeout=10)
-                return response.status_code == 200
+                if response.status_code != 200:
+                    return False
+                from app.config import settings
+                if (
+                    settings.demo_mode
+                    and response.json().get("size", 0) > self.MAX_CLONE_SIZE_KB
+                ):
+                    logger.warning("Refusing demo repository above the clone-size limit")
+                    return False
+                return True
             
             return False
             
