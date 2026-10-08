@@ -30,3 +30,9 @@ def test_fixture_ingest_is_idempotent_and_chat_is_grounded():
     missing = client.post("/api/chat", json={"question": "Explain Kubernetes deployment secrets"})
     assert missing.status_code == 200, missing.text
     assert "Not found in repo" in missing.json()["answer"]
+
+    unrelated = client.post(
+        "/api/chat", json={"question": "Which database engine stores orders?"}
+    )
+    assert unrelated.status_code == 200, unrelated.text
+    assert "Not found in repo" in unrelated.json()["answer"]
