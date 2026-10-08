@@ -128,5 +128,6 @@ async def test_azure_embedding_mode_calls_mocked_client(monkeypatch):
     assert len(embedded) == 1
     assert embedded[0].embedding == [0.25] * 1536
     client.embeddings.create.assert_awaited_once_with(
-        input=["def main(): pass"], model=settings.azure_openai_embedding_deployment
+        input=["File path: src/main.py\ndef main(): pass"],
+        model=settings.azure_openai_embedding_deployment,
     )

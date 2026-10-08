@@ -1,14 +1,11 @@
 """
-Embedding service for generating vector embeddings using Azure OpenAI.
+Embedding service for Azure OpenAI or optional local FastEmbed vectors.
 
-This service handles the generation of vector embeddings for code chunks using
-Azure OpenAI's text-embedding-3-small model, with batch processing and retry logic.
+This service handles code chunk embeddings with batch processing and retry logic.
 """
 
 import asyncio
-import hashlib
 import logging
-import re
 from datetime import datetime
 from typing import List, Optional
 from openai import AsyncAzureOpenAI
@@ -43,8 +40,21 @@ class EmbeddingService:
         else:
             # Import settings only when needed to avoid config issues in tests
             from app.config import settings
-            self.embedding_model = "local-hash-v1" if settings.demo_mode else settings.azure_openai_embedding_deployment
+            self.embedding_model = settings.azure_openai_embedding_deployment
             self.local_mode = settings.demo_mode
+            self.local_model = None
+            self.use_local_embeddings = settings.demo_mode and settings.local_embeddings
+            if self.use_local_embeddings:
+                try:
+                    from fastembed import TextEmbedding
+                except ImportError as exc:
+                    raise RuntimeError(
+                        "LOCAL_EMBEDDINGS=true requires the optional dependencies in requirements-local.txt"
+                    ) from exc
+                self.embedding_model = settings.local_embedding_model
+                self.local_model = TextEmbedding(model_name=self.embedding_model, threads=2)
+            elif settings.demo_mode:
+                self.embedding_model = "bm25-only"
             self.client = None if settings.demo_mode else AsyncAzureOpenAI(
                 api_key=settings.azure_openai_embedding_api_key,
                 api_version=settings.azure_openai_embedding_api_version,
@@ -69,8 +79,22 @@ class EmbeddingService:
         if not chunks:
             return []
 
+        embedding_texts = [self._chunk_embedding_text(chunk) for chunk in chunks]
         if self.local_mode:
-            return [EmbeddedChunk(chunk=chunk, embedding=self._local_embedding(chunk.content), embedding_model=self.embedding_model, created_at=datetime.utcnow()) for chunk in chunks]
+            vectors = (
+                await asyncio.to_thread(self._embed_local, embedding_texts)
+                if self.use_local_embeddings
+                else [[] for _ in chunks]
+            )
+            return [
+                EmbeddedChunk(
+                    chunk=chunk,
+                    embedding=vector,
+                    embedding_model=self.embedding_model,
+                    created_at=datetime.utcnow(),
+                )
+                for chunk, vector in zip(chunks, vectors)
+            ]
             
         logger.info(f"Generating embeddings for {len(chunks)} code chunks")
         
@@ -82,7 +106,9 @@ class EmbeddingService:
             logger.debug(f"Processing batch {i//self.batch_size + 1} with {len(batch)} chunks")
             
             try:
-                batch_embeddings = await self._batch_embed([chunk.content for chunk in batch])
+                batch_embeddings = await self._batch_embed(
+                    [self._chunk_embedding_text(chunk) for chunk in batch]
+                )
                 
                 # Create EmbeddedChunk objects with metadata
                 for chunk, embedding in zip(batch, batch_embeddings):
@@ -120,7 +146,9 @@ class EmbeddingService:
             Exception: If API call fails after retries
         """
         if self.local_mode:
-            return [self._local_embedding(text) for text in texts]
+            if not self.use_local_embeddings:
+                return [[] for _ in texts]
+            return await asyncio.to_thread(self._embed_local, texts)
         try:
             logger.debug(f"Calling Azure OpenAI embedding API for {len(texts)} texts")
             
@@ -152,18 +180,21 @@ class EmbeddingService:
         Raises:
             Exception: If embedding generation fails
         """
+        if self.local_mode and not self.use_local_embeddings:
+            return []
         embeddings = await self._batch_embed([text])
         return embeddings[0]
 
     @staticmethod
-    def _local_embedding(text: str, dimensions: int = 256) -> List[float]:
-        """Deterministic feature-hash vector; no network or model credentials."""
-        vector = [0.0] * dimensions
-        for token in re.findall(r"[A-Za-z_][A-Za-z_0-9]*", text.lower()):
-            digest = hashlib.sha256(token.encode("utf-8")).digest()
-            vector[int.from_bytes(digest[:4], "big") % dimensions] += 1.0
-        norm = sum(value * value for value in vector) ** 0.5
-        return [value / norm for value in vector] if norm else vector
+    def _chunk_embedding_text(chunk: CodeChunk) -> str:
+        return f"File path: {chunk.file_path}\n{chunk.content}"
+
+    def _embed_local(self, texts: List[str]) -> List[List[float]]:
+        """Run the optional local FastEmbed model with no remote inference API."""
+        return [
+            vector.tolist()
+            for vector in self.local_model.embed(texts, batch_size=32, parallel=None)
+        ]
     
     async def close(self):
         """Close the Azure OpenAI client connection."""

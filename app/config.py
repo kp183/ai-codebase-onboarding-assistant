@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     debug: bool = False
     log_level: str = "INFO"
     demo_mode: bool = False
+    local_embeddings: bool = False
+    local_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     cors_allowed_origins: str = (
         "http://localhost:8000,http://127.0.0.1:8000,"
         "http://localhost:8002,http://127.0.0.1:8002"

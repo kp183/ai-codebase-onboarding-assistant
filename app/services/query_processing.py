@@ -88,22 +88,7 @@ class QueryProcessingService:
             )
 
             if self.local_mode:
-                query_terms = set(
-                    re.findall(r"[A-Za-z_][A-Za-z_0-9]*", user_question.lower())
-                )
-                retrieved_terms = {
-                    token
-                    for result in relevant_chunks[:3]
-                    for token in re.findall(
-                        r"[A-Za-z_][A-Za-z_0-9]*", result.chunk.content.lower()
-                    )
-                }
-                has_direct_match = bool(query_terms & retrieved_terms)
-                if (
-                    not relevant_chunks
-                    or relevant_chunks[0].score < 0.10
-                    or not has_direct_match
-                ):
+                if not relevant_chunks or relevant_chunks[0].score < 0.18:
                     answer = "Not found in repo. I could not retrieve code chunks with enough matching content to answer this question."
                     relevant_chunks = []
                 else:
@@ -165,6 +150,7 @@ class QueryProcessingService:
                 query_embedding=query_embedding,
                 top_k=top_k,
                 repo_id=repo_id,
+                query_text=query,
             )
             
             logger.debug(f"Retrieved {len(search_results)} relevant chunks")

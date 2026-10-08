@@ -1,0 +1,49 @@
+{
+  "repos": {
+    "flask": {
+      "source": "https://github.com/pallets/flask",
+      "questions": [
+        {"question": "Where does Flask route an incoming request to the registered view?", "expected_file": "src/flask/app.py"},
+        {"question": "Which decorator connects a URL rule with a view function?", "expected_file": "src/flask/sansio/scaffold.py"},
+        {"question": "How does Flask register a blueprint, including a child blueprint?", "expected_file": "src/flask/sansio/blueprints.py"},
+        {"question": "Where is the default signed-cookie session interface implemented?", "expected_file": "src/flask/sessions.py"},
+        {"question": "How does the Flask CLI load variables from a dotenv file?", "expected_file": "src/flask/cli.py"},
+        {"question": "How can configuration values be loaded from variables with a chosen prefix?", "expected_file": "src/flask/config.py"},
+        {"question": "Where does Flask locate and render a named Jinja template?", "expected_file": "src/flask/templating.py"},
+        {"question": "How is current_app made available as a context-local proxy?", "expected_file": "src/flask/globals.py"},
+        {"question": "Which helper serves a file from a specified directory safely?", "expected_file": "src/flask/helpers.py"},
+        {"question": "How does the tutorial protect a view so only signed-in users can open it?", "expected_file": "examples/tutorial/flaskr/auth.py"}
+      ]
+    },
+    "click": {
+      "source": "https://github.com/pallets/click",
+      "questions": [
+        {"question": "Where does a command create the context used during invocation?", "expected_file": "src/click/core.py"},
+        {"question": "How does Click parse command-line option tokens and values?", "expected_file": "src/click/parser.py"},
+        {"question": "What decorator passes the active context into a command callback?", "expected_file": "src/click/decorators.py"},
+        {"question": "How does a group resolve and invoke one of its subcommands?", "expected_file": "src/click/core.py"},
+        {"question": "Where are interactive text prompts and yes-or-no confirmations handled?", "expected_file": "src/click/termui.py"},
+        {"question": "Which class writes a command's usage and help layout?", "expected_file": "src/click/formatting.py"},
+        {"question": "How can a decorator attach an option parameter to a command function?", "expected_file": "src/click/decorators.py"},
+        {"question": "Where does Click convert and validate a parsed parameter value?", "expected_file": "src/click/core.py"},
+        {"question": "How does the parser distinguish a short option from a long option?", "expected_file": "src/click/parser.py"},
+        {"question": "Where are visible commands selected for shell completion?", "expected_file": "src/click/core.py"}
+      ]
+    },
+    "requests": {
+      "source": "https://github.com/psf/requests",
+      "questions": [
+        {"question": "How does the top-level GET helper send an HTTP request?", "expected_file": "src/requests/api.py"},
+        {"question": "Where does a Session prepare and send requests while retaining state?", "expected_file": "src/requests/sessions.py"},
+        {"question": "How are credentials handled when a redirect changes the host?", "expected_file": "src/requests/sessions.py"},
+        {"question": "How does HTTP basic authentication build the Authorization header?", "expected_file": "src/requests/auth.py"},
+        {"question": "Which adapter sends prepared requests through urllib3?", "expected_file": "src/requests/adapters.py"},
+        {"question": "Where are query parameters encoded into a request URL?", "expected_file": "src/requests/models.py"},
+        {"question": "How is a JSON response body decoded into Python data?", "expected_file": "src/requests/models.py"},
+        {"question": "How does the cookie jar add stored cookies to a prepared request?", "expected_file": "src/requests/cookies.py"},
+        {"question": "Where does the HTTP adapter configure connection and read timeouts?", "expected_file": "src/requests/adapters.py"},
+        {"question": "How can a session construct a PreparedRequest using session defaults?", "expected_file": "src/requests/sessions.py"}
+      ]
+    }
+  }
+}

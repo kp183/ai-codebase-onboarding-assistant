@@ -7,6 +7,8 @@ for code chunk retrieval.
 """
 
 import logging
+import math
+import re
 from typing import List, Optional, Dict, Any
 from azure.search.documents import SearchClient
 from azure.search.documents.indexes import SearchIndexClient
@@ -295,7 +297,8 @@ class SearchService:
     
     def vector_search(self, query_embedding: List[float], top_k: int = 5,
                      filters: Optional[str] = None,
-                     repo_id: Optional[str] = None) -> List[SearchResult]:
+                     repo_id: Optional[str] = None,
+                     query_text: str = "") -> List[SearchResult]:
         """
         Perform vector similarity search against stored embeddings.
         
@@ -315,11 +318,25 @@ class SearchService:
                 return []
             scoped_filter = self._repo_filter(repo_id, filters)
             if self.local_mode:
+                documents = [
+                    (chunk, vector)
+                    for chunk, vector in _LOCAL_DOCUMENTS.values()
+                    if chunk.repo_id == repo_id
+                ]
+                lexical_scores = self._bm25_scores(query_text, documents)
                 scored = []
-                for chunk, vector in _LOCAL_DOCUMENTS.values():
-                    if chunk.repo_id != repo_id:
-                        continue
-                    score = sum(a * b for a, b in zip(query_embedding, vector))
+                for (chunk, vector), lexical in zip(documents, lexical_scores):
+                    vector_score = (
+                        max(0.0, sum(a * b for a, b in zip(query_embedding, vector)))
+                        if query_embedding and vector
+                        else 0.0
+                    )
+                    # BM25 is a fallback and also contributes when vectors exist.
+                    normalized_bm25 = lexical / (lexical + 2.5) if lexical else 0.0
+                    if query_embedding and vector:
+                        score = 0.60 * vector_score + 0.40 * normalized_bm25
+                    else:
+                        score = normalized_bm25
                     scored.append(SearchResult(chunk, score))
                 return sorted(scored, key=lambda result: result.score, reverse=True)[:top_k]
             logger.debug(f"Performing vector search with top_k={top_k}")
@@ -333,7 +350,7 @@ class SearchService:
             
             # Perform the search
             search_results = self.search_client.search(
-                search_text=None,
+                search_text=query_text or None,
                 vector_queries=[vector_query],
                 filter=scoped_filter,
                 top=top_k,
@@ -369,6 +386,50 @@ class SearchService:
         except Exception as e:
             logger.error(f"Vector search failed: {str(e)}")
             raise
+
+    @staticmethod
+    def _bm25_scores(query_text: str, documents: List[tuple]) -> List[float]:
+        """Return repository-scoped BM25 scores for query terms and file paths."""
+        tokenize = lambda text: re.findall(r"[a-zA-Z_][a-zA-Z_0-9]*", text.lower())
+        stop_words = {
+            "a", "about", "an", "and", "are", "does", "for", "from", "how",
+            "in", "is", "it", "of", "on", "or", "the", "to", "what", "when",
+            "where", "which", "who", "why", "with",
+        }
+        query_terms = set(tokenize(query_text)) - stop_words
+        doc_tokens = [tokenize(f"{chunk.file_path} {chunk.content}") for chunk, _ in documents]
+        if not query_terms or not doc_tokens:
+            return [0.0] * len(documents)
+
+        doc_term_sets = [set(tokens) for tokens in doc_tokens]
+        doc_freq = {
+            term: sum(term in token_set for token_set in doc_term_sets)
+            for term in query_terms
+        }
+        avg_length = sum(map(len, doc_tokens)) / len(doc_tokens) or 1.0
+        scores = []
+        for tokens in doc_tokens:
+            frequencies = {}
+            for token in tokens:
+                frequencies[token] = frequencies.get(token, 0) + 1
+            score = 0.0
+            for term in query_terms:
+                frequency = frequencies.get(term, 0)
+                if not frequency:
+                    continue
+                inverse_frequency = math.log(
+                    1 + (len(doc_tokens) - doc_freq[term] + 0.5) / (doc_freq[term] + 0.5)
+                )
+                score += inverse_frequency * (
+                    frequency * 2.5
+                    / (frequency + 1.5 * (0.25 + 0.75 * len(tokens) / avg_length))
+                )
+            query_coverage = (
+                sum(frequencies.get(term, 0) > 0 for term in query_terms)
+                / len(query_terms)
+            )
+            scores.append(score * query_coverage)
+        return scores
     
     def search_by_text(self, query_text: str, top_k: int = 5,
                       filters: Optional[str] = None,
